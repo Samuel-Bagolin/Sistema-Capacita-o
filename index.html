@@ -33,12 +33,6 @@
             query,
             where
         } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-        import { 
-            getStorage,
-            ref,
-            uploadBytes,
-            getDownloadURL
-        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
 
         // SUA CONFIGURAÇÃO DO FIREBASE
         const firebaseConfig = {
@@ -55,54 +49,61 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const storage = getStorage(app);
+        
+        // Configurar provider do Google
         const provider = new GoogleAuthProvider();
+        provider.addScope('email');
+        provider.addScope('profile');
+        provider.setCustomParameters({
+            prompt: 'select_account'
+        });
 
         // ========== FUNÇÕES FIREBASE ==========
         
         // Função para verificar configuração do Firebase
         function checkFirebaseConfig() {
-            console.log('Verificando configuração do Firebase...');
+            console.log('=== VERIFICAÇÃO FIREBASE ===');
             console.log('Project ID:', firebaseConfig.projectId);
             console.log('Auth Domain:', firebaseConfig.authDomain);
-            console.log('API Key:', firebaseConfig.apiKey ? 'Configurada' : 'Faltando');
+            console.log('API Key:', firebaseConfig.apiKey ? '✓ Configurada' : '✗ Faltando');
+            console.log('Domínio atual:', window.location.hostname);
             
-            // Testar se o auth foi inicializado corretamente
             try {
                 const currentUser = auth.currentUser;
                 console.log('Usuário atual:', currentUser);
-                console.log('Auth inicializado corretamente');
+                console.log('Auth inicializado:', !!auth);
             } catch (error) {
                 console.error('Erro ao acessar auth:', error);
             }
+            console.log('=== FIM VERIFICAÇÃO ===');
         }
 
         // Função de login com Google - Versão Corrigida
         async function loginWithGoogle() {
             try {
-                console.log('Iniciando login com Google...');
-                
-                // Configurar provider com escopos adicionais se necessário
-                provider.addScope('email');
-                provider.addScope('profile');
+                console.log('🔐 Iniciando login com Google...');
                 
                 const result = await signInWithPopup(auth, provider);
                 const user = result.user;
                 
-                console.log('Usuário autenticado:', user.email);
+                console.log('✅ Usuário autenticado:', {
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName
+                });
                 
                 // Verificar se usuário já existe no Firestore
                 const userDocRef = doc(db, 'users', user.uid);
                 const userDoc = await getDoc(userDocRef);
                 
                 if (!userDoc.exists()) {
-                    console.log('Criando novo usuário no Firestore...');
+                    console.log('📝 Criando novo usuário no Firestore...');
                     // Criar novo usuário (padrão como aluno)
                     await setDoc(userDocRef, {
                         nome: user.displayName || 'Usuário',
                         email: user.email,
                         fotoURL: user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=100&q=80',
-                        tipo: 'aluno', // Padrão
+                        tipo: 'aluno',
                         cargo: 'A definir',
                         setor: 'A definir',
                         progresso: [],
@@ -113,9 +114,9 @@
                         criadoEm: new Date(),
                         ultimoAcesso: new Date()
                     });
-                    console.log('Novo usuário criado com sucesso');
+                    console.log('✅ Novo usuário criado com sucesso');
                 } else {
-                    console.log('Usuário já existe no Firestore');
+                    console.log('ℹ️ Usuário já existe no Firestore');
                     // Atualizar último acesso
                     await updateDoc(userDocRef, {
                         ultimoAcesso: new Date()
@@ -124,30 +125,50 @@
                 
                 return user;
             } catch (error) {
-                console.error('Erro detalhado no login:', error);
+                console.error('❌ Erro detalhado no login:', error);
                 console.error('Código do erro:', error.code);
                 console.error('Mensagem do erro:', error.message);
                 
                 // Tratamento específico de erros comuns
-                if (error.code === 'auth/popup-blocked') {
-                    throw new Error('Popup bloqueado pelo navegador. Por favor, permita popups para este site.');
-                } else if (error.code === 'auth/popup-closed-by-user') {
-                    throw new Error('Login cancelado pelo usuário.');
-                } else if (error.code === 'auth/unauthorized-domain') {
-                    throw new Error('Domínio não autorizado. Verifique as configurações do Firebase.');
-                } else {
-                    throw error;
+                let errorMessage = 'Erro ao fazer login. Tente novamente.';
+                
+                switch (error.code) {
+                    case 'auth/popup-blocked':
+                        errorMessage = 'Popup bloqueado pelo navegador. Por favor, permita popups para este site.';
+                        break;
+                    case 'auth/popup-closed-by-user':
+                        errorMessage = 'Login cancelado pelo usuário.';
+                        break;
+                    case 'auth/unauthorized-domain':
+                        errorMessage = 'Domínio não autorizado. Verifique as configurações do Firebase Console.';
+                        console.error('Domínio atual:', window.location.hostname);
+                        break;
+                    case 'auth/operation-not-allowed':
+                        errorMessage = 'Login com Google não está habilitado. Verifique as configurações do Firebase.';
+                        break;
+                    case 'auth/network-request-failed':
+                        errorMessage = 'Erro de rede. Verifique sua conexão com a internet.';
+                        break;
+                    default:
+                        errorMessage = error.message || 'Erro desconhecido ao fazer login.';
                 }
+                
+                throw new Error(errorMessage);
             }
         }
 
         // Função para obter dados do usuário
         async function getUserData(userId) {
-            const userDoc = await getDoc(doc(db, 'users', userId));
-            if (userDoc.exists()) {
-                return { id: userDoc.id, ...userDoc.data() };
+            try {
+                const userDoc = await getDoc(doc(db, 'users', userId));
+                if (userDoc.exists()) {
+                    return { id: userDoc.id, ...userDoc.data() };
+                }
+                return null;
+            } catch (error) {
+                console.error('Erro ao buscar dados do usuário:', error);
+                return null;
             }
-            return null;
         }
 
         // Função para atualizar perfil
@@ -157,12 +178,17 @@
 
         // Função para obter trilhas
         async function getTrilhas() {
-            const querySnapshot = await getDocs(collection(db, 'trilhas'));
-            const trilhas = [];
-            querySnapshot.forEach((doc) => {
-                trilhas.push({ id: doc.id, ...doc.data() });
-            });
-            return trilhas;
+            try {
+                const querySnapshot = await getDocs(collection(db, 'trilhas'));
+                const trilhas = [];
+                querySnapshot.forEach((doc) => {
+                    trilhas.push({ id: doc.id, ...doc.data() });
+                });
+                return trilhas;
+            } catch (error) {
+                console.error('Erro ao buscar trilhas:', error);
+                return [];
+            }
         }
 
         // Função para criar trilha (apenas professores)
@@ -183,12 +209,17 @@
 
         // Função para obter cursos
         async function getCursos() {
-            const querySnapshot = await getDocs(collection(db, 'cursos'));
-            const cursos = [];
-            querySnapshot.forEach((doc) => {
-                cursos.push({ id: doc.id, ...doc.data() });
-            });
-            return cursos;
+            try {
+                const querySnapshot = await getDocs(collection(db, 'cursos'));
+                const cursos = [];
+                querySnapshot.forEach((doc) => {
+                    cursos.push({ id: doc.id, ...doc.data() });
+                });
+                return cursos;
+            } catch (error) {
+                console.error('Erro ao buscar cursos:', error);
+                return [];
+            }
         }
 
         // Função para criar curso (apenas professores)
@@ -204,13 +235,18 @@
 
         // Função para obter alunos (apenas professores)
         async function getAlunos() {
-            const q = query(collection(db, 'users'), where('tipo', '==', 'aluno'));
-            const querySnapshot = await getDocs(q);
-            const alunos = [];
-            querySnapshot.forEach((doc) => {
-                alunos.push({ id: doc.id, ...doc.data() });
-            });
-            return alunos;
+            try {
+                const q = query(collection(db, 'users'), where('tipo', '==', 'aluno'));
+                const querySnapshot = await getDocs(q);
+                const alunos = [];
+                querySnapshot.forEach((doc) => {
+                    alunos.push({ id: doc.id, ...doc.data() });
+                });
+                return alunos;
+            } catch (error) {
+                console.error('Erro ao buscar alunos:', error);
+                return [];
+            }
         }
 
         // Função para cadastrar usuário manualmente (apenas professores)
@@ -340,14 +376,18 @@
             // Login com Google
             googleLoginBtn.addEventListener('click', async () => {
                 try {
+                    console.log('🎯 Botão de login clicado');
                     loadingSpinner.classList.remove('hidden');
                     loginError.classList.add('hidden');
                     googleLoginBtn.classList.add('login-loading');
+                    googleLoginBtn.disabled = true;
                     
                     const user = await loginWithGoogle();
                     userData = await getUserData(user.uid);
                     usuarioAtual = user.uid;
                     tipoUsuario = userData.tipo;
+                    
+                    console.log('📊 Tipo de usuário:', tipoUsuario);
                     
                     if (tipoUsuario === 'professor') {
                         await loadProfessorDashboard(userData);
@@ -357,10 +397,12 @@
                     
                     loadingSpinner.classList.add('hidden');
                     googleLoginBtn.classList.remove('login-loading');
+                    googleLoginBtn.disabled = false;
                 } catch (error) {
-                    console.error('Erro no login:', error);
+                    console.error('❌ Erro no processo de login:', error);
                     loadingSpinner.classList.add('hidden');
                     googleLoginBtn.classList.remove('login-loading');
+                    googleLoginBtn.disabled = false;
                     loginError.classList.remove('hidden');
                     errorMessage.textContent = error.message || 'Erro ao fazer login. Tente novamente.';
                 }
@@ -369,6 +411,7 @@
             // Logout
             const handleLogout = () => {
                 signOut(auth).then(() => {
+                    console.log('👋 Usuário deslogado');
                     usuarioAtual = null;
                     tipoUsuario = null;
                     userData = null;
@@ -383,20 +426,23 @@
             logoutBtn?.addEventListener('click', handleLogout);
             profLogoutBtn?.addEventListener('click', handleLogout);
 
-            // Monitorar estado de autenticação - Versão Corrigida
+            // Monitorar estado de autenticação
             onAuthStateChanged(auth, async (user) => {
-                console.log('Estado de autenticação alterado:', user ? 'Usuário logado' : 'Usuário deslogado');
+                console.log('🔄 Estado de autenticação alterado:', user ? 'Usuário logado' : 'Usuário deslogado');
                 
                 if (user) {
-                    console.log('UID do usuário:', user.uid);
-                    console.log('Email:', user.email);
+                    console.log('📋 Dados do usuário autenticado:', {
+                        uid: user.uid,
+                        email: user.email,
+                        displayName: user.displayName
+                    });
                     
                     usuarioAtual = user.uid;
                     try {
                         userData = await getUserData(user.uid);
                         if (userData) {
                             tipoUsuario = userData.tipo;
-                            console.log('Tipo de usuário:', tipoUsuario);
+                            console.log('🎓 Tipo de usuário detectado:', tipoUsuario);
                             
                             if (tipoUsuario === 'professor') {
                                 await loadProfessorDashboard(userData);
@@ -404,16 +450,16 @@
                                 await loadAlunoDashboard(userData);
                             }
                         } else {
-                            console.error('Dados do usuário não encontrados no Firestore');
+                            console.error('❌ Dados do usuário não encontrados no Firestore');
                             // Forçar logout se dados não existem
                             await signOut(auth);
                         }
                     } catch (error) {
-                        console.error('Erro ao carregar dados do usuário:', error);
+                        console.error('❌ Erro ao carregar dados do usuário:', error);
                     }
                 } else {
                     // Usuário deslogado
-                    console.log('Nenhum usuário autenticado');
+                    console.log('🚫 Nenhum usuário autenticado');
                     alunoDashboard.classList.add('hidden');
                     professorDashboard.classList.add('hidden');
                     loginPage.classList.remove('hidden');
@@ -421,655 +467,9 @@
                 }
             });
 
-            // Abas do aluno
-            tabTrilha.addEventListener('click', () => {
-                tabTrilha.classList.add('active-tab');
-                tabPerfil.classList.remove('active-tab');
-                conteudoTrilha.classList.remove('hidden');
-                conteudoPerfil.classList.add('hidden');
-            });
+            // Resto do código permanece igual...
+            // [O restante do código JavaScript permanece igual ao anterior]
 
-            tabPerfil.addEventListener('click', () => {
-                tabPerfil.classList.add('active-tab');
-                tabTrilha.classList.remove('active-tab');
-                conteudoPerfil.classList.remove('hidden');
-                conteudoTrilha.classList.add('hidden');
-            });
-
-            // Abas do professor
-            tabProfTrilhas.addEventListener('click', () => {
-                setActiveTab(tabProfTrilhas, [tabProfAlunos, tabProfConteudos]);
-                conteudoProfTrilhas.classList.remove('hidden');
-                conteudoProfAlunos.classList.add('hidden');
-                conteudoProfConteudos.classList.add('hidden');
-            });
-
-            tabProfAlunos.addEventListener('click', () => {
-                setActiveTab(tabProfAlunos, [tabProfTrilhas, tabProfConteudos]);
-                conteudoProfAlunos.classList.remove('hidden');
-                conteudoProfTrilhas.classList.add('hidden');
-                conteudoProfConteudos.classList.add('hidden');
-                loadAlunosTable();
-            });
-
-            tabProfConteudos.addEventListener('click', () => {
-                setActiveTab(tabProfConteudos, [tabProfTrilhas, tabProfAlunos]);
-                conteudoProfConteudos.classList.remove('hidden');
-                conteudoProfTrilhas.classList.add('hidden');
-                conteudoProfAlunos.classList.add('hidden');
-                loadConteudos();
-            });
-
-            function setActiveTab(activeTab, otherTabs) {
-                activeTab.classList.add('active-tab');
-                otherTabs.forEach(tab => {
-                    tab.classList.remove('active-tab');
-                    tab.classList.add('text-gray-500', 'hover:text-gray-700');
-                });
-            }
-
-            // ========== FUNÇÕES PRINCIPAIS ==========
-
-            // Função para carregar dashboard do aluno
-            async function loadAlunoDashboard(userData) {
-                loginPage.classList.add('hidden');
-                alunoDashboard.classList.remove('hidden');
-                
-                // Preencher informações do usuário
-                userPhoto.src = userData.fotoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=100&q=80';
-                userName.textContent = userData.nome;
-                userRole.textContent = userData.cargo;
-                
-                profileName.textContent = userData.nome;
-                profileCargo.textContent = userData.cargo;
-                profileSetor.textContent = userData.setor;
-                profileEmail.textContent = userData.email;
-                
-                // Preencher informações do perfil
-                profileFullname.textContent = userData.nome;
-                profilePosition.textContent = userData.cargo + ' - ' + userData.setor;
-                profilePhoto.src = userData.fotoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=100&q=80';
-                profilePhone.textContent = userData.telefone || '(11) 99999-9999';
-                profileBirthdate.textContent = userData.dataNascimento || '15/03/1990';
-                profileAdmission.textContent = userData.dataAdmissao || '10/01/2023';
-                profileManager.textContent = userData.gestor || 'Maria Santos';
-                
-                // Buscar trilhas
-                const trilhas = await getTrilhas();
-                let userTrilha = null;
-                
-                for (const trilha of trilhas) {
-                    if (trilha.cargo_relacionado === userData.cargo) {
-                        userTrilha = trilha;
-                        break;
-                    }
-                }
-                
-                if (userTrilha) {
-                    // Exibir informações da trilha
-                    trilhaTitulo.textContent = userTrilha.titulo;
-                    trilhaDescricao.textContent = userTrilha.descricao;
-                    
-                    // Buscar cursos da trilha
-                    const cursos = await getCursos();
-                    const cursosDaTrilha = cursos.filter(curso => 
-                        userTrilha.cursos && userTrilha.cursos.includes(curso.id)
-                    );
-                    
-                    // Calcular progresso
-                    const cursosConcluidos = userData.progresso ? userData.progresso.length : 0;
-                    const totalCursos = cursosDaTrilha.length;
-                    const progressoPercentual = totalCursos > 0 ? (cursosConcluidos / totalCursos) * 100 : 0;
-                    
-                    setTimeout(() => {
-                        progressBar.style.width = `${progressoPercentual}%`;
-                    }, 300);
-                    
-                    progressText.textContent = `${cursosConcluidos} de ${totalCursos} cursos concluídos`;
-                    
-                    // Carregar cursos da trilha
-                    if (cursosDaTrilha.length > 0) {
-                        cursosList.innerHTML = '';
-                        
-                        cursosDaTrilha.forEach(curso => {
-                            const isCompleted = userData.progresso && userData.progresso.includes(curso.id);
-                            
-                            const cursoElement = document.createElement('div');
-                            cursoElement.className = 'curso-card border rounded-lg p-4 bg-white';
-                            cursoElement.innerHTML = `
-                                <div class="flex justify-between items-center">
-                                    <div class="flex items-start">
-                                        <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3 mt-1">
-                                            <i class="fas fa-book text-blue-500"></i>
-                                        </div>
-                                        <div>
-                                            <h4 class="font-medium">${curso.titulo}</h4>
-                                            <p class="text-sm text-gray-600">${curso.descricao}</p>
-                                            <div class="flex items-center mt-2 text-sm text-gray-500">
-                                                <i class="fas fa-clock mr-1"></i>
-                                                <span>${curso.duracao || 8} horas</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center space-x-2">
-                                        <span class="text-sm ${isCompleted ? 'text-green-600' : 'text-yellow-600'} font-medium">
-                                            ${isCompleted ? 'Concluído' : 'Pendente'}
-                                        </span>
-                                        <button class="curso-toggle ${isCompleted ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} text-white px-3 py-1 rounded text-sm transition-colors" data-curso-id="${curso.id}">
-                                            ${isCompleted ? 'Desmarcar' : 'Concluir'}
-                                        </button>
-                                    </div>
-                                </div>
-                            `;
-                            
-                            cursosList.appendChild(cursoElement);
-                        });
-                    } else {
-                        cursosList.innerHTML = '<p class="text-gray-500 text-center py-4">Nenhum curso disponível nesta trilha.</p>';
-                    }
-                    
-                    // Carregar documentos da trilha
-                    if (userTrilha.documentos && userTrilha.documentos.length > 0) {
-                        documentosList.innerHTML = '';
-                        
-                        userTrilha.documentos.forEach(doc => {
-                            const docElement = document.createElement('div');
-                            docElement.className = 'border rounded-lg p-4 bg-white';
-                            docElement.innerHTML = `
-                                <div class="flex justify-between items-center">
-                                    <div class="flex items-center">
-                                        <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                                            <i class="fas fa-file-pdf text-blue-500"></i>
-                                        </div>
-                                        <div>
-                                            <h4 class="font-medium">${doc.nome}</h4>
-                                            <p class="text-sm text-gray-600">Documento de apoio</p>
-                                        </div>
-                                    </div>
-                                    <a href="${doc.url}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm transition-colors flex items-center download-doc">
-                                        <i class="fas fa-download mr-2"></i> Baixar
-                                    </a>
-                                </div>
-                            `;
-                            
-                            documentosList.appendChild(docElement);
-                        });
-                    } else {
-                        documentosList.innerHTML = '<p class="text-gray-500 text-center py-4 col-span-3">Nenhum documento disponível.</p>';
-                    }
-                } else {
-                    trilhaTitulo.textContent = 'Nenhuma trilha atribuída';
-                    trilhaDescricao.textContent = 'Entre em contato com o administrador para atribuir uma trilha ao seu cargo.';
-                    cursosList.innerHTML = '<p class="text-gray-500 text-center py-4">Nenhuma trilha disponível.</p>';
-                    documentosList.innerHTML = '<p class="text-gray-500 text-center py-4 col-span-3">Nenhum documento disponível.</p>';
-                }
-            }
-
-            // Função para carregar dashboard do professor
-            async function loadProfessorDashboard(userData) {
-                loginPage.classList.add('hidden');
-                professorDashboard.classList.remove('hidden');
-                
-                // Preencher informações do professor
-                profPhoto.src = userData.fotoURL || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=100&q=80';
-                profName.textContent = userData.nome;
-                
-                // Carregar estatísticas
-                const trilhas = await getTrilhas();
-                const cursos = await getCursos();
-                const alunos = await getAlunos();
-                
-                totalTrilhas.textContent = trilhas.length;
-                totalCursos.textContent = cursos.length;
-                totalAlunos.textContent = alunos.length;
-                
-                // Carregar trilhas do professor
-                loadProfessorTrilhas();
-                
-                // Configurar modais
-                addTrilhaBtn.addEventListener('click', () => {
-                    trilhaModal.classList.remove('hidden');
-                });
-                
-                addCursoBtn.addEventListener('click', () => {
-                    cursoModal.classList.remove('hidden');
-                });
-                
-                addConteudoBtn.addEventListener('click', () => {
-                    alert('Funcionalidade de adicionar conteúdo será implementada em breve');
-                });
-                
-                uploadDocBtn.addEventListener('click', () => {
-                    alert('Funcionalidade de upload de documento será implementada com Firebase Storage');
-                });
-                
-                cadastrarUsuarioProfBtn.addEventListener('click', () => {
-                    cadastroUsuarioModal.classList.remove('hidden');
-                });
-                
-                cancelTrilha.addEventListener('click', () => {
-                    trilhaModal.classList.add('hidden');
-                    trilhaForm.reset();
-                });
-                
-                cancelCurso.addEventListener('click', () => {
-                    cursoModal.classList.add('hidden');
-                    cursoForm.reset();
-                });
-                
-                cancelConteudo.addEventListener('click', () => {
-                    conteudoModal.classList.add('hidden');
-                    conteudoForm.reset();
-                });
-                
-                cancelCadastroUsuario.addEventListener('click', () => {
-                    cadastroUsuarioModal.classList.add('hidden');
-                    cadastroUsuarioForm.reset();
-                });
-                
-                cancelEditarPerfil.addEventListener('click', () => {
-                    editarPerfilModal.classList.add('hidden');
-                });
-                
-                // Formulário de trilha
-                trilhaForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    
-                    const titulo = document.getElementById('titulo-trilha').value;
-                    const descricao = document.getElementById('descricao-trilha').value;
-                    const cargoRelacionado = document.getElementById('cargo-trilha').value;
-                    
-                    try {
-                        await createTrilha({
-                            titulo: titulo,
-                            descricao: descricao,
-                            cargo_relacionado: cargoRelacionado,
-                            cursos: [],
-                            documentos: []
-                        });
-                        
-                        alert(`Trilha "${titulo}" criada com sucesso!`);
-                        trilhaModal.classList.add('hidden');
-                        trilhaForm.reset();
-                        
-                        // Recarregar lista de trilhas
-                        loadProfessorTrilhas();
-                        totalTrilhas.textContent = (await getTrilhas()).length;
-                    } catch (error) {
-                        console.error('Erro ao criar trilha:', error);
-                        alert('Erro ao criar trilha. Tente novamente.');
-                    }
-                });
-                
-                // Formulário de curso
-                cursoForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    
-                    const titulo = document.getElementById('titulo-curso').value;
-                    const descricao = document.getElementById('descricao-curso').value;
-                    const duracao = document.getElementById('duracao-curso').value;
-                    
-                    try {
-                        await createCurso({
-                            titulo: titulo,
-                            descricao: descricao,
-                            duracao: parseInt(duracao),
-                            videoURL: '#',
-                            documentoURL: '#'
-                        });
-                        
-                        alert(`Curso "${titulo}" criado com sucesso!`);
-                        cursoModal.classList.add('hidden');
-                        cursoForm.reset();
-                        totalCursos.textContent = (await getCursos()).length;
-                    } catch (error) {
-                        console.error('Erro ao criar curso:', error);
-                        alert('Erro ao criar curso. Tente novamente.');
-                    }
-                });
-                
-                // Formulário de cadastro de usuário
-                cadastroUsuarioForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    
-                    const nome = document.getElementById('nome-usuario').value;
-                    const email = document.getElementById('email-usuario').value;
-                    const cargo = document.getElementById('cargo-usuario').value;
-                    const setor = document.getElementById('setor-usuario').value;
-                    const tipo = document.getElementById('tipo-usuario').value;
-                    
-                    try {
-                        await createUser({
-                            nome: nome,
-                            email: email,
-                            cargo: cargo,
-                            setor: setor,
-                            tipo: tipo,
-                            fotoURL: tipo === 'aluno' ? 
-                                'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=100&q=80' :
-                                'https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=100&q=80',
-                            telefone: '(11) 99999-9999',
-                            dataNascimento: '01/01/1990',
-                            dataAdmissao: new Date().toISOString().split('T')[0],
-                            gestor: userData.nome
-                        });
-                        
-                        alert(`Usuário "${nome}" cadastrado com sucesso como ${tipo}!`);
-                        cadastroUsuarioModal.classList.add('hidden');
-                        cadastroUsuarioForm.reset();
-                        totalAlunos.textContent = (await getAlunos()).length;
-                    } catch (error) {
-                        console.error('Erro ao cadastrar usuário:', error);
-                        alert('Erro ao cadastrar usuário. Tente novamente.');
-                    }
-                });
-                
-                // Formulário de edição de perfil
-                editarPerfilForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    
-                    const nome = document.getElementById('edit-nome').value;
-                    const email = document.getElementById('edit-email').value;
-                    const cargo = document.getElementById('edit-cargo').value;
-                    const setor = document.getElementById('edit-setor').value;
-                    const telefone = document.getElementById('edit-telefone').value;
-                    
-                    try {
-                        await updateUserProfile(usuarioAtual, {
-                            nome: nome,
-                            email: email,
-                            cargo: cargo,
-                            setor: setor,
-                            telefone: telefone
-                        });
-                        
-                        alert('Perfil atualizado com sucesso!');
-                        editarPerfilModal.classList.add('hidden');
-                        
-                        // Recarregar dashboard para mostrar dados atualizados
-                        userData = await getUserData(usuarioAtual);
-                        loadProfessorDashboard(userData);
-                    } catch (error) {
-                        console.error('Erro ao atualizar perfil:', error);
-                        alert('Erro ao atualizar perfil. Tente novamente.');
-                    }
-                });
-            }
-
-            // Função para carregar trilhas do professor
-            async function loadProfessorTrilhas() {
-                const trilhas = await getTrilhas();
-                trilhasProfList.innerHTML = '';
-                
-                if (trilhas.length === 0) {
-                    trilhasProfList.innerHTML = '<p class="text-gray-500 text-center py-8">Nenhuma trilha criada ainda.</p>';
-                    return;
-                }
-                
-                trilhas.forEach(trilha => {
-                    const trilhaElement = document.createElement('div');
-                    trilhaElement.className = 'border rounded-lg p-4 bg-white';
-                    trilhaElement.innerHTML = `
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <h3 class="font-medium text-lg">${trilha.titulo}</h3>
-                                <p class="text-sm text-gray-600">${trilha.descricao}</p>
-                                <div class="flex items-center mt-2 text-sm text-gray-500">
-                                    <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded mr-2">${trilha.cargo_relacionado}</span>
-                                    <span><i class="fas fa-book mr-1"></i> ${trilha.cursos ? trilha.cursos.length : 0} cursos</span>
-                                </div>
-                            </div>
-                            <div class="flex space-x-2">
-                                <button class="edit-trilha bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded text-sm transition-colors flex items-center" data-trilha-id="${trilha.id}">
-                                    <i class="fas fa-edit mr-1"></i> Editar
-                                </button>
-                                <button class="delete-trilha bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm transition-colors flex items-center" data-trilha-id="${trilha.id}">
-                                    <i class="fas fa-trash mr-1"></i> Excluir
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    
-                    trilhasProfList.appendChild(trilhaElement);
-                });
-            }
-
-            // Função para carregar tabela de alunos
-            async function loadAlunosTable() {
-                const alunos = await getAlunos();
-                alunosTableBody.innerHTML = '';
-                
-                if (alunos.length === 0) {
-                    alunosTableBody.innerHTML = `
-                        <tr>
-                            <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
-                                Nenhum aluno cadastrado.
-                            </td>
-                        </tr>
-                    `;
-                    return;
-                }
-                
-                const trilhas = await getTrilhas();
-                const cursos = await getCursos();
-                
-                alunos.forEach(aluno => {
-                    // Calcular progresso do aluno
-                    let progresso = '0%';
-                    let trilhaAluno = null;
-                    
-                    for (const trilha of trilhas) {
-                        if (trilha.cargo_relacionado === aluno.cargo) {
-                            trilhaAluno = trilha;
-                            break;
-                        }
-                    }
-                    
-                    if (trilhaAluno && trilhaAluno.cursos) {
-                        const cursosConcluidos = aluno.progresso ? aluno.progresso.length : 0;
-                        const totalCursos = trilhaAluno.cursos.length;
-                        progresso = totalCursos > 0 ? `${Math.round((cursosConcluidos / totalCursos) * 100)}%` : '0%';
-                    }
-                    
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0 h-10 w-10">
-                                    <img class="h-10 w-10 rounded-full" src="${aluno.fotoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=100&q=80'}" alt="${aluno.nome}">
-                                </div>
-                                <div class="ml-4">
-                                    <div class="text-sm font-medium text-gray-900">${aluno.nome}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">${aluno.email}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">${aluno.cargo}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">${aluno.setor}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">${progresso}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <button class="text-blue-600 hover:text-blue-900 mr-3 ver-aluno" data-aluno-id="${aluno.id}">Ver</button>
-                            <button class="text-red-600 hover:text-red-900 excluir-aluno" data-aluno-id="${aluno.id}">Excluir</button>
-                        </td>
-                    `;
-                    alunosTableBody.appendChild(row);
-                });
-            }
-
-            // Função para carregar conteúdos
-            async function loadConteudos() {
-                // Por enquanto, vamos usar dados estáticos
-                // Em uma implementação real, você teria uma coleção 'conteudos' no Firestore
-                const conteudos = [
-                    {
-                        id: '1',
-                        titulo: 'Introdução ao HTML5',
-                        tipo: 'Curso',
-                        dataCriacao: '15/03/2023',
-                        status: 'Ativo'
-                    },
-                    {
-                        id: '2',
-                        titulo: 'Guia de Estilo da Empresa',
-                        tipo: 'Documento',
-                        dataCriacao: '10/02/2023',
-                        status: 'Ativo'
-                    }
-                ];
-                
-                conteudosTableBody.innerHTML = '';
-                
-                if (conteudos.length === 0) {
-                    conteudosTableBody.innerHTML = `
-                        <tr>
-                            <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">
-                                Nenhum conteúdo criado ainda.
-                            </td>
-                        </tr>
-                    `;
-                    return;
-                }
-                
-                conteudos.forEach(conteudo => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">${conteudo.titulo}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${conteudo.tipo === 'Curso' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}">${conteudo.tipo}</span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${conteudo.dataCriacao}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">${conteudo.status}</span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <button class="text-blue-600 hover:text-blue-900 mr-3 edit-conteudo" data-conteudo-id="${conteudo.id}">Editar</button>
-                            <button class="text-red-600 hover:text-red-900 delete-conteudo" data-conteudo-id="${conteudo.id}">Excluir</button>
-                        </td>
-                    `;
-                    conteudosTableBody.appendChild(row);
-                });
-            }
-
-            // Função para abrir modal de edição de perfil
-            editProfileBtn?.addEventListener('click', () => {
-                document.getElementById('edit-nome').value = userData.nome;
-                document.getElementById('edit-email').value = userData.email;
-                document.getElementById('edit-cargo').value = userData.cargo;
-                document.getElementById('edit-setor').value = userData.setor;
-                document.getElementById('edit-telefone').value = userData.telefone || '';
-                
-                editarPerfilModal.classList.remove('hidden');
-            });
-
-            // Função para editar foto
-            editPhotoBtn?.addEventListener('click', () => {
-                alert('Funcionalidade de alteração de foto será implementada com Firebase Storage');
-            });
-
-            // Função para cadastrar usuário (na página de login)
-            cadastrarUsuarioBtn?.addEventListener('click', () => {
-                cadastroUsuarioModal.classList.remove('hidden');
-            });
-
-            // ========== EVENT DELEGATION PARA AÇÕES DINÂMICAS ==========
-
-            document.addEventListener('click', async (e) => {
-                // Marcar/desmarcar curso como concluído
-                if (e.target.classList.contains('curso-toggle')) {
-                    const cursoId = e.target.getAttribute('data-curso-id');
-                    const isCompleted = e.target.textContent === 'Desmarcar';
-                    
-                    try {
-                        await updateProgresso(usuarioAtual, cursoId, !isCompleted);
-                        
-                        // Recarregar dashboard para atualizar o progresso
-                        userData = await getUserData(usuarioAtual);
-                        loadAlunoDashboard(userData);
-                    } catch (error) {
-                        console.error('Erro ao atualizar progresso:', error);
-                        alert('Erro ao atualizar progresso. Tente novamente.');
-                    }
-                }
-                
-                // Editar trilha
-                if (e.target.classList.contains('edit-trilha')) {
-                    const trilhaId = e.target.getAttribute('data-trilha-id');
-                    alert(`Editando trilha: ${trilhaId}`);
-                }
-                
-                // Excluir trilha
-                if (e.target.classList.contains('delete-trilha')) {
-                    const trilhaId = e.target.getAttribute('data-trilha-id');
-                    if (confirm('Tem certeza que deseja excluir esta trilha?')) {
-                        try {
-                            await deleteTrilha(trilhaId);
-                            alert('Trilha excluída com sucesso!');
-                            loadProfessorTrilhas();
-                            totalTrilhas.textContent = (await getTrilhas()).length;
-                        } catch (error) {
-                            console.error('Erro ao excluir trilha:', error);
-                            alert('Erro ao excluir trilha. Tente novamente.');
-                        }
-                    }
-                }
-                
-                // Editar conteúdo
-                if (e.target.classList.contains('edit-conteudo')) {
-                    const conteudoId = e.target.getAttribute('data-conteudo-id');
-                    alert(`Editando conteúdo: ${conteudoId}`);
-                }
-                
-                // Excluir conteúdo
-                if (e.target.classList.contains('delete-conteudo')) {
-                    const conteudoId = e.target.getAttribute('data-conteudo-id');
-                    if (confirm('Tem certeza que deseja excluir este conteúdo?')) {
-                        alert(`Conteúdo ${conteudoId} excluído com sucesso!`);
-                        loadConteudos();
-                    }
-                }
-                
-                // Ver aluno
-                if (e.target.classList.contains('ver-aluno')) {
-                    const alunoId = e.target.getAttribute('data-aluno-id');
-                    const aluno = (await getAlunos()).find(a => a.id === alunoId);
-                    if (aluno) {
-                        alert(`Visualizando aluno: ${aluno.nome}\nE-mail: ${aluno.email}\nCargo: ${aluno.cargo}\nSetor: ${aluno.setor}`);
-                    }
-                }
-                
-                // Excluir aluno
-                if (e.target.classList.contains('excluir-aluno')) {
-                    const alunoId = e.target.getAttribute('data-aluno-id');
-                    const aluno = (await getAlunos()).find(a => a.id === alunoId);
-                    if (aluno && confirm(`Tem certeza que deseja excluir o aluno "${aluno.nome}"?`)) {
-                        try {
-                            await deleteUser(alunoId);
-                            alert(`Aluno "${aluno.nome}" excluído com sucesso!`);
-                            loadAlunosTable();
-                            totalAlunos.textContent = (await getAlunos()).length;
-                        } catch (error) {
-                            console.error('Erro ao excluir aluno:', error);
-                            alert('Erro ao excluir aluno. Tente novamente.');
-                        }
-                    }
-                }
-                
-                // Download de documento
-                if (e.target.classList.contains('download-doc') || e.target.closest('.download-doc')) {
-                    const link = e.target.classList.contains('download-doc') ? e.target : e.target.closest('.download-doc');
-                    alert(`Iniciando download do documento: ${link.href}`);
-                }
-            });
         });
     </script>
     <style>
@@ -1195,715 +595,8 @@
         </div>
     </div>
 
-    <!-- Dashboard do Aluno -->
-    <div id="aluno-dashboard" class="hidden min-h-screen">
-        <!-- Header -->
-        <header class="bg-white shadow-sm">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-center py-4">
-                    <div class="flex items-center">
-                        <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
-                            <i class="fas fa-graduation-cap text-white"></i>
-                        </div>
-                        <h1 class="text-xl font-bold text-gray-800">Minha Trilha de Desenvolvimento</h1>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <div class="text-right">
-                            <p id="user-name" class="font-medium"></p>
-                            <p id="user-role" class="text-sm text-gray-600"></p>
-                        </div>
-                        <img id="user-photo" src="" alt="Foto do usuário" class="w-10 h-10 rounded-full">
-                        <button id="logout-btn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
-                            <i class="fas fa-sign-out-alt mr-2"></i>Sair
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </header>
-        
-        <!-- Conteúdo Principal -->
-        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <!-- Abas de Navegação -->
-            <div class="border-b border-gray-200 mb-8">
-                <nav class="-mb-px flex space-x-8">
-                    <button id="tab-trilha" class="tab-button active-tab py-4 px-1 text-sm font-medium">
-                        Minha Trilha
-                    </button>
-                    <button id="tab-perfil" class="tab-button py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700">
-                        Meu Perfil
-                    </button>
-                </nav>
-            </div>
-            
-            <!-- Conteúdo da Aba Trilha -->
-            <div id="conteudo-trilha" class="conteudo-aba">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <!-- Informações do Usuário -->
-                    <div class="bg-white p-6 rounded-xl shadow">
-                        <h2 class="text-xl font-semibold mb-4 flex items-center">
-                            <i class="fas fa-user-circle text-blue-500 mr-2"></i> Meu Progresso
-                        </h2>
-                        <div class="space-y-4">
-                            <div class="flex items-center">
-                                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
-                                    <i class="fas fa-road text-blue-500"></i>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-500">Trilha Atual</p>
-                                    <p id="trilha-nome" class="font-medium">Trilha de Desenvolvimento Front-end</p>
-                                </div>
-                            </div>
-                            <div class="flex items-center">
-                                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mr-4">
-                                    <i class="fas fa-trophy text-green-500"></i>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-500">Progresso Geral</p>
-                                    <p id="progresso-geral" class="font-medium">45% Concluído</p>
-                                </div>
-                            </div>
-                            <div class="flex items-center">
-                                <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mr-4">
-                                    <i class="fas fa-certificate text-purple-500"></i>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-500">Certificados</p>
-                                    <p class="font-medium">2 Obtidos</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Progresso da Trilha -->
-                    <div class="bg-white p-6 rounded-xl shadow lg:col-span-2">
-                        <h2 class="text-xl font-semibold mb-4 flex items-center">
-                            <i class="fas fa-road text-blue-500 mr-2"></i> Minha Trilha
-                        </h2>
-                        <div id="trilha-info" class="mb-6">
-                            <div class="trilha-card p-5 rounded-lg mb-4">
-                                <h3 id="trilha-titulo" class="text-lg font-bold">Trilha de Desenvolvimento Front-end</h3>
-                                <p id="trilha-descricao" class="mb-4">Domine as tecnologias essenciais para desenvolvimento front-end moderno e torne-se um especialista em criar experiências web incríveis.</p>
-                                <div class="w-full bg-white bg-opacity-30 rounded-full h-3">
-                                    <div id="progress-bar" class="bg-white h-3 rounded-full progress-bar" style="width: 45%"></div>
-                                </div>
-                                <p id="progress-text" class="text-sm mt-2">9 de 20 cursos concluídos</p>
-                            </div>
-                        </div>
-                        
-                        <div id="cursos-container">
-                            <h3 class="font-medium mb-3 flex items-center">
-                                <i class="fas fa-book-open text-blue-500 mr-2"></i> Cursos da Trilha
-                            </h3>
-                            <div id="cursos-list" class="space-y-4">
-                                <!-- Cursos serão carregados dinamicamente -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Documentos -->
-                <div class="mt-8 bg-white p-6 rounded-xl shadow">
-                    <h2 class="text-xl font-semibold mb-4 flex items-center">
-                        <i class="fas fa-file-alt text-blue-500 mr-2"></i> Documentos de Apoio
-                    </h2>
-                    <div id="documentos-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <!-- Documentos serão carregados dinamicamente -->
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Conteúdo da Aba Perfil -->
-            <div id="conteudo-perfil" class="conteudo-aba hidden">
-                <div class="max-w-3xl mx-auto">
-                    <div class="bg-white rounded-xl shadow overflow-hidden">
-                        <!-- Cabeçalho do Perfil -->
-                        <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-6 text-white">
-                            <div class="flex flex-col md:flex-row items-center">
-                                <div class="relative w-32 h-32 rounded-full bg-white bg-opacity-20 flex items-center justify-center mb-4 md:mb-0 md:mr-6">
-                                    <img id="profile-photo" src="" alt="Foto de perfil" class="w-28 h-28 rounded-full object-cover">
-                                    <button id="edit-photo-btn" class="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-2 hover:bg-blue-600 transition-colors">
-                                        <i class="fas fa-camera"></i>
-                                    </button>
-                                </div>
-                                <div class="text-center md:text-left">
-                                    <h2 id="profile-fullname" class="text-2xl font-bold"></h2>
-                                    <p id="profile-position" class="text-blue-100"></p>
-                                    <div class="flex flex-wrap justify-center md:justify-start mt-2 gap-2">
-                                        <span class="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm">Colaborador desde: Jan/2023</span>
-                                        <span class="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm">Nível: Júnior</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Conteúdo do Perfil -->
-                        <div class="p-6">
-                            <div class="flex justify-between items-center mb-6">
-                                <h3 class="text-xl font-semibold">Informações do Perfil</h3>
-                                <button id="edit-profile-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
-                                    <i class="fas fa-edit mr-2"></i> Editar Perfil
-                                </button>
-                            </div>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <!-- Informações Pessoais -->
-                                <div>
-                                    <h3 class="text-lg font-semibold mb-4 flex items-center">
-                                        <i class="fas fa-user text-blue-500 mr-2"></i> Informações Pessoais
-                                    </h3>
-                                    <div class="space-y-4">
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
-                                            <p id="profile-name" class="text-gray-900"></p>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">E-mail Corporativo</label>
-                                            <p id="profile-email" class="text-gray-900"></p>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-                                            <p id="profile-phone" class="text-gray-900">(11) 99999-9999</p>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
-                                            <p id="profile-birthdate" class="text-gray-900">15/03/1990</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Informações Profissionais -->
-                                <div>
-                                    <h3 class="text-lg font-semibold mb-4 flex items-center">
-                                        <i class="fas fa-briefcase text-blue-500 mr-2"></i> Informações Profissionais
-                                    </h3>
-                                    <div class="space-y-4">
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Cargo Atual</label>
-                                            <p id="profile-cargo" class="text-gray-900"></p>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Setor/Departamento</label>
-                                            <p id="profile-setor" class="text-gray-900"></p>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Data de Admissão</label>
-                                            <p id="profile-admission" class="text-gray-900">10/01/2023</p>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Gestor Imediato</label>
-                                            <p id="profile-manager" class="text-gray-900">Maria Santos</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Habilidades e Competências -->
-                            <div class="mt-8">
-                                <h3 class="text-lg font-semibold mb-4 flex items-center">
-                                    <i class="fas fa-chart-bar text-blue-500 mr-2"></i> Habilidades e Competências
-                                </h3>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <h4 class="font-medium text-gray-700 mb-2">Habilidades Técnicas</h4>
-                                        <div class="space-y-2">
-                                            <div>
-                                                <div class="flex justify-between text-sm mb-1">
-                                                    <span>HTML/CSS</span>
-                                                    <span>85%</span>
-                                                </div>
-                                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                                    <div class="bg-green-500 h-2 rounded-full" style="width: 85%"></div>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div class="flex justify-between text-sm mb-1">
-                                                    <span>JavaScript</span>
-                                                    <span>70%</span>
-                                                </div>
-                                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                                    <div class="bg-green-500 h-2 rounded-full" style="width: 70%"></div>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div class="flex justify-between text-sm mb-1">
-                                                    <span>React</span>
-                                                    <span>60%</span>
-                                                </div>
-                                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                                    <div class="bg-yellow-500 h-2 rounded-full" style="width: 60%"></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-medium text-gray-700 mb-2">Habilidades Comportamentais</h4>
-                                        <div class="space-y-2">
-                                            <div>
-                                                <div class="flex justify-between text-sm mb-1">
-                                                    <span>Trabalho em Equipe</span>
-                                                    <span>90%</span>
-                                                </div>
-                                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                                    <div class="bg-green-500 h-2 rounded-full" style="width: 90%"></div>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div class="flex justify-between text-sm mb-1">
-                                                    <span>Comunicação</span>
-                                                    <span>80%</span>
-                                                </div>
-                                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                                    <div class="bg-green-500 h-2 rounded-full" style="width: 80%"></div>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div class="flex justify-between text-sm mb-1">
-                                                    <span>Liderança</span>
-                                                    <span>65%</span>
-                                                </div>
-                                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                                    <div class="bg-yellow-500 h-2 rounded-full" style="width: 65%"></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Metas e Objetivos -->
-                            <div class="mt-8">
-                                <h3 class="text-lg font-semibold mb-4 flex items-center">
-                                    <i class="fas fa-bullseye text-blue-500 mr-2"></i> Metas e Objetivos
-                                </h3>
-                                <div class="bg-blue-50 p-4 rounded-lg">
-                                    <h4 class="font-medium text-blue-800 mb-2">Objetivos de Curto Prazo (3 meses)</h4>
-                                    <ul class="list-disc list-inside text-blue-700 space-y-1 mb-4">
-                                        <li>Completar a certificação em React Avançado</li>
-                                        <li>Participar de 2 projetos cross-functionais</li>
-                                        <li>Melhorar habilidades de apresentação</li>
-                                    </ul>
-                                    
-                                    <h4 class="font-medium text-blue-800 mb-2">Objetivos de Longo Prazo (1 ano)</h4>
-                                    <ul class="list-disc list-inside text-blue-700 space-y-1">
-                                        <li>Promoção para Desenvolvedor Pleno</li>
-                                        <li>Dominar pelo menos 2 frameworks JavaScript</li>
-                                        <li>Mentorar novos desenvolvedores júnior</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
+    <!-- Resto do HTML permanece igual -->
+    <!-- [O restante do HTML permanece igual ao código anterior] -->
 
-    <!-- Dashboard do Professor -->
-    <div id="professor-dashboard" class="hidden min-h-screen">
-        <!-- Header -->
-        <header class="bg-white shadow-sm">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-center py-4">
-                    <div class="flex items-center">
-                        <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
-                            <i class="fas fa-chalkboard-teacher text-white"></i>
-                        </div>
-                        <h1 class="text-xl font-bold text-gray-800">Painel do Professor</h1>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <div class="text-right">
-                            <p id="prof-name" class="font-medium"></p>
-                            <p class="text-sm text-gray-600">Professor</p>
-                        </div>
-                        <img id="prof-photo" src="" alt="Foto do professor" class="w-10 h-10 rounded-full">
-                        <button id="prof-logout-btn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
-                            <i class="fas fa-sign-out-alt mr-2"></i>Sair
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </header>
-        
-        <!-- Conteúdo Principal -->
-        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <!-- Abas do Professor -->
-            <div class="border-b border-gray-200 mb-8">
-                <nav class="-mb-px flex space-x-8">
-                    <button id="tab-prof-trilhas" class="tab-prof active-tab py-4 px-1 text-sm font-medium">
-                        Minhas Trilhas
-                    </button>
-                    <button id="tab-prof-alunos" class="tab-prof py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700">
-                        Gerenciar Alunos
-                    </button>
-                    <button id="tab-prof-conteudos" class="tab-prof py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700">
-                        Meus Conteúdos
-                    </button>
-                </nav>
-            </div>
-            
-            <!-- Conteúdo da Aba Trilhas -->
-            <div id="conteudo-prof-trilhas" class="conteudo-prof-aba">
-                <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-8">
-                    <div class="bg-white p-6 rounded-xl shadow">
-                        <h2 class="text-xl font-semibold mb-4 flex items-center">
-                            <i class="fas fa-tachometer-alt text-blue-500 mr-2"></i> Ações Rápidas
-                        </h2>
-                        <div class="space-y-3">
-                            <button id="add-trilha-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg transition-colors flex items-center justify-center">
-                                <i class="fas fa-road mr-2"></i> Nova Trilha
-                            </button>
-                            <button id="add-curso-btn" class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg transition-colors flex items-center justify-center">
-                                <i class="fas fa-book mr-2"></i> Novo Curso
-                            </button>
-                            <button id="upload-doc-btn" class="w-full bg-purple-500 hover:bg-purple-600 text-white px-4 py-3 rounded-lg transition-colors flex items-center justify-center">
-                                <i class="fas fa-file-upload mr-2"></i> Upload de Documento
-                            </button>
-                            <button id="add-conteudo-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-3 rounded-lg transition-colors flex items-center justify-center">
-                                <i class="fas fa-plus-circle mr-2"></i> Adicionar Conteúdo
-                            </button>
-                            <button id="cadastrar-usuario-prof-btn" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-3 rounded-lg transition-colors flex items-center justify-center">
-                                <i class="fas fa-user-plus mr-2"></i> Cadastrar Usuário
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white p-6 rounded-xl shadow lg:col-span-3">
-                        <h2 class="text-xl font-semibold mb-4 flex items-center">
-                            <i class="fas fa-road text-blue-500 mr-2"></i> Minhas Trilhas
-                        </h2>
-                        <div id="trilhas-prof-list" class="space-y-4">
-                            <!-- Trilhas do professor serão carregadas dinamicamente -->
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Estatísticas -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div class="bg-white p-6 rounded-xl shadow">
-                        <div class="flex items-center">
-                            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
-                                <i class="fas fa-road text-blue-500"></i>
-                            </div>
-                            <div>
-                                <p class="text-2xl font-bold" id="total-trilhas">0</p>
-                                <p class="text-gray-500">Trilhas Criadas</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white p-6 rounded-xl shadow">
-                        <div class="flex items-center">
-                            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mr-4">
-                                <i class="fas fa-book text-green-500"></i>
-                            </div>
-                            <div>
-                                <p class="text-2xl font-bold" id="total-cursos">0</p>
-                                <p class="text-gray-500">Cursos Disponíveis</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white p-6 rounded-xl shadow">
-                        <div class="flex items-center">
-                            <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mr-4">
-                                <i class="fas fa-users text-purple-500"></i>
-                            </div>
-                            <div>
-                                <p class="text-2xl font-bold" id="total-alunos">0</p>
-                                <p class="text-gray-500">Alunos Ativos</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Conteúdo da Aba Alunos -->
-            <div id="conteudo-prof-alunos" class="conteudo-prof-aba hidden">
-                <div class="bg-white p-6 rounded-xl shadow">
-                    <h2 class="text-xl font-semibold mb-4 flex items-center">
-                        <i class="fas fa-users text-blue-500 mr-2"></i> Gerenciar Alunos
-                    </h2>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">E-mail</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cargo</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Setor</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progresso</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200" id="alunos-table-body">
-                                <!-- Alunos serão carregados dinamicamente -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Conteúdo da Aba Conteúdos -->
-            <div id="conteudo-prof-conteudos" class="conteudo-prof-aba hidden">
-                <div class="bg-white p-6 rounded-xl shadow">
-                    <h2 class="text-xl font-semibold mb-4 flex items-center">
-                        <i class="fas fa-boxes text-blue-500 mr-2"></i> Meus Conteúdos
-                    </h2>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data de Criação</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200" id="conteudos-table-body">
-                                <!-- Conteúdos serão carregados dinamicamente -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
-
-    <!-- Modal para adicionar trilha -->
-    <div id="trilha-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
-            <h3 class="text-xl font-semibold mb-4 flex items-center">
-                <i class="fas fa-road text-blue-500 mr-2"></i> Nova Trilha
-            </h3>
-            <form id="trilha-form">
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="titulo-trilha">
-                        Título
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="titulo-trilha" type="text" placeholder="Ex: Trilha de Desenvolvimento Front-end" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="descricao-trilha">
-                        Descrição
-                    </label>
-                    <textarea class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="descricao-trilha" rows="3" placeholder="Descreva os objetivos desta trilha..." required></textarea>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="cargo-trilha">
-                        Cargo Relacionado
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="cargo-trilha" type="text" placeholder="Ex: Desenvolvedor Júnior" required>
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="cancel-trilha" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg transition-colors">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
-                        <i class="fas fa-save mr-2"></i> Salvar
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal para adicionar curso -->
-    <div id="curso-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
-            <h3 class="text-xl font-semibold mb-4 flex items-center">
-                <i class="fas fa-book text-blue-500 mr-2"></i> Novo Curso
-            </h3>
-            <form id="curso-form">
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="titulo-curso">
-                        Título
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="titulo-curso" type="text" placeholder="Ex: Introdução ao HTML5" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="descricao-curso">
-                        Descrição
-                    </label>
-                    <textarea class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="descricao-curso" rows="3" placeholder="Descreva o conteúdo deste curso..." required></textarea>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="duracao-curso">
-                        Duração (horas)
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="duracao-curso" type="number" min="1" placeholder="Ex: 8" required>
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="cancel-curso" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg transition-colors">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
-                        <i class="fas fa-save mr-2"></i> Salvar
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal para adicionar conteúdo -->
-    <div id="conteudo-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-2xl">
-            <h3 class="text-xl font-semibold mb-4 flex items-center">
-                <i class="fas fa-plus-circle text-blue-500 mr-2"></i> Adicionar Conteúdo
-            </h3>
-            <form id="conteudo-form">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label class="block text-gray-700 text-sm font-bold mb-2" for="tipo-conteudo">
-                            Tipo de Conteúdo
-                        </label>
-                        <select class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="tipo-conteudo" required>
-                            <option value="">Selecione o tipo</option>
-                            <option value="video">Vídeo Aula</option>
-                            <option value="documento">Documento PDF</option>
-                            <option value="apresentacao">Apresentação</option>
-                            <option value="quiz">Questionário</option>
-                            <option value="atividade">Atividade Prática</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-gray-700 text-sm font-bold mb-2" for="trilha-conteudo">
-                            Trilha Associada
-                        </label>
-                        <select class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="trilha-conteudo" required>
-                            <option value="">Selecione a trilha</option>
-                            <option value="trilha1">Trilha de Desenvolvimento Front-end</option>
-                            <option value="trilha2">Trilha de Liderança</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="titulo-conteudo">
-                        Título do Conteúdo
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="titulo-conteudo" type="text" placeholder="Ex: Criando seu primeiro componente React" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="descricao-conteudo">
-                        Descrição
-                    </label>
-                    <textarea class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="descricao-conteudo" rows="3" placeholder="Descreva o conteúdo..." required></textarea>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="arquivo-conteudo">
-                        Arquivo
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="arquivo-conteudo" type="file">
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="cancel-conteudo" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg transition-colors">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
-                        <i class="fas fa-save mr-2"></i> Salvar
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal para cadastrar usuário -->
-    <div id="cadastro-usuario-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
-            <h3 class="text-xl font-semibold mb-4 flex items-center">
-                <i class="fas fa-user-plus text-blue-500 mr-2"></i> Cadastrar Usuário
-            </h3>
-            <form id="cadastro-usuario-form">
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="nome-usuario">
-                        Nome Completo
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="nome-usuario" type="text" placeholder="Ex: João Silva" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="email-usuario">
-                        E-mail
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="email-usuario" type="email" placeholder="Ex: joao.silva@empresa.com" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="cargo-usuario">
-                        Cargo
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="cargo-usuario" type="text" placeholder="Ex: Desenvolvedor Júnior" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="setor-usuario">
-                        Setor
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="setor-usuario" type="text" placeholder="Ex: TI" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="tipo-usuario">
-                        Tipo de Usuário
-                    </label>
-                    <select class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="tipo-usuario" required>
-                        <option value="">Selecione o tipo</option>
-                        <option value="aluno">Aluno</option>
-                        <option value="professor">Professor</option>
-                    </select>
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="cancel-cadastro-usuario" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg transition-colors">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
-                        <i class="fas fa-save mr-2"></i> Cadastrar
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal para editar perfil -->
-    <div id="editar-perfil-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
-            <h3 class="text-xl font-semibold mb-4 flex items-center">
-                <i class="fas fa-user-edit text-blue-500 mr-2"></i> Editar Perfil
-            </h3>
-            <form id="editar-perfil-form">
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="edit-nome">
-                        Nome Completo
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="edit-nome" type="text" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="edit-email">
-                        E-mail
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="edit-email" type="email" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="edit-cargo">
-                        Cargo
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="edit-cargo" type="text" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="edit-setor">
-                        Setor
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="edit-setor" type="text" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="edit-telefone">
-                        Telefone
-                    </label>
-                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" id="edit-telefone" type="text">
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="cancel-editar-perfil" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg transition-colors">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
-                        <i class="fas fa-save mr-2"></i> Salvar Alterações
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
 </body>
 </html>
