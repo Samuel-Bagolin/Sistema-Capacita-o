@@ -4,10 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portal de Desenvolvimento Profissional</title>
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
     <style>
         :root {
             --primary-color: #2c3e50;
@@ -495,7 +491,7 @@
             <form id="loginForm">
                 <div class="form-group">
                     <label for="email">E-mail</label>
-                    <input type="email" id="email" class="form-control" placeholder="seu@email.com" required value="samuel.bagolin@setuptecnologia.com.br">
+                    <input type="email" id="email" class="form-control" placeholder="seu@email.com" required>
                 </div>
                 <div class="form-group">
                     <label for="password">Senha</label>
@@ -506,6 +502,9 @@
             </form>
             <div class="form-group" style="margin-top: 20px; text-align: center;">
                 <p>Não tem uma conta? <a href="#" id="showRegister">Cadastre-se</a></p>
+            </div>
+            <div class="form-group" style="margin-top: 15px; text-align: center;">
+                <p><small><strong>Para teste:</strong> Use qualquer e-mail e senha com pelo menos 6 caracteres</small></p>
             </div>
         </div>
     </div>
@@ -529,7 +528,7 @@
                 </div>
                 <div class="form-group">
                     <label for="regPassword">Senha</label>
-                    <input type="password" id="regPassword" class="form-control" placeholder="Mínimo 6 caracteres" required>
+                    <input type="password" id="regPassword" class="form-control" placeholder="Mínimo 6 caracteres" required minlength="6">
                 </div>
                 <button type="submit" class="btn btn-primary" id="registerBtn">Cadastrar</button>
                 <div id="registerError" class="error-message hidden"></div>
@@ -551,7 +550,7 @@
                         <h1>Portal de Desenvolvimento</h1>
                     </div>
                     <div class="user-info">
-                        <img id="userPhoto" src="https://via.placeholder.com/150" alt="Foto do colaborador">
+                        <img id="userPhoto" src="https://ui-avatars.com/api/?name=Usuario&background=3498db&color=fff" alt="Foto do colaborador">
                         <div class="user-details">
                             <div id="userName" class="user-name">Carregando...</div>
                             <div id="userRole" class="user-role">Carregando...</div>
@@ -695,22 +694,129 @@
     </div>
 
     <script>
-        // Configuração do Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyBrYUi-4NNEfBulesb-TzPc6o69PnUpadI",
-            authDomain: "sistema-jornada-colaborador.firebaseapp.com",
-            databaseURL: "https://sistema-jornada-colaborador-default-rtdb.firebaseio.com",
-            projectId: "sistema-jornada-colaborador",
-            storageBucket: "sistema-jornada-colaborador.firebasestorage.app",
-            messagingSenderId: "883814857933",
-            appId: "1:883814857933:web:85e572d93198f4d36e3d84",
-            measurementId: "G-1GT7JJWJ0G"
-        };
+        // Sistema de autenticação simplificado sem Firebase
+        class SimpleAuth {
+            constructor() {
+                this.users = JSON.parse(localStorage.getItem('portal_users')) || [];
+                this.currentUser = JSON.parse(localStorage.getItem('portal_current_user')) || null;
+                this.courses = JSON.parse(localStorage.getItem('portal_courses')) || this.getDefaultCourses();
+            }
 
-        // Inicializar Firebase
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+            getDefaultCourses() {
+                return [
+                    {
+                        id: '1',
+                        title: "Marketing Digital Avançado",
+                        category: "Marketing Digital",
+                        description: "Aprenda as melhores estratégias de marketing digital para impulsionar seus resultados.",
+                        progress: 80,
+                        color: "#3498db",
+                        status: "in-progress"
+                    },
+                    {
+                        id: '2',
+                        title: "Liderança e Gestão de Equipes",
+                        category: "Liderança",
+                        description: "Desenvolva habilidades de liderança para gerenciar equipes de alta performance.",
+                        progress: 45,
+                        color: "#2ecc71",
+                        status: "in-progress"
+                    },
+                    {
+                        id: '3',
+                        title: "Excel para Profissionais",
+                        category: "Excel",
+                        description: "Domine as principais funcionalidades do Excel para análise de dados e relatórios.",
+                        progress: 100,
+                        color: "#e74c3c",
+                        status: "completed"
+                    },
+                    {
+                        id: '4',
+                        title: "Comunicação Eficaz",
+                        category: "Comunicação",
+                        description: "Aprimore suas habilidades de comunicação para melhorar relacionamentos profissionais.",
+                        progress: 20,
+                        color: "#9b59b6",
+                        status: "pending"
+                    }
+                ];
+            }
+
+            register(name, role, email, password) {
+                // Verificar se usuário já existe
+                if (this.users.find(user => user.email === email)) {
+                    throw new Error('Este e-mail já está em uso por outra conta.');
+                }
+
+                // Criar novo usuário
+                const newUser = {
+                    id: Date.now().toString(),
+                    name,
+                    role,
+                    email,
+                    password, // Em um sistema real, isso seria hash
+                    isAdmin: this.users.length === 0, // Primeiro usuário é admin
+                    createdAt: new Date().toISOString()
+                };
+
+                this.users.push(newUser);
+                this.saveUsers();
+                return newUser;
+            }
+
+            login(email, password) {
+                const user = this.users.find(u => u.email === email && u.password === password);
+                if (!user) {
+                    throw new Error('E-mail ou senha incorretos.');
+                }
+                this.currentUser = user;
+                localStorage.setItem('portal_current_user', JSON.stringify(user));
+                return user;
+            }
+
+            logout() {
+                this.currentUser = null;
+                localStorage.removeItem('portal_current_user');
+            }
+
+            saveUsers() {
+                localStorage.setItem('portal_users', JSON.stringify(this.users));
+            }
+
+            saveCourses() {
+                localStorage.setItem('portal_courses', JSON.stringify(this.courses));
+            }
+
+            addCourse(courseData) {
+                const newCourse = {
+                    id: Date.now().toString(),
+                    ...courseData,
+                    progress: 0,
+                    status: 'pending',
+                    createdAt: new Date().toISOString()
+                };
+                this.courses.push(newCourse);
+                this.saveCourses();
+                return newCourse;
+            }
+
+            updateCourseProgress(courseId, progress) {
+                const course = this.courses.find(c => c.id === courseId);
+                if (course) {
+                    course.progress = progress;
+                    course.status = progress === 100 ? 'completed' : progress > 0 ? 'in-progress' : 'pending';
+                    this.saveCourses();
+                }
+            }
+
+            getCourses() {
+                return this.courses;
+            }
+        }
+
+        // Inicializar sistema de autenticação
+        const auth = new SimpleAuth();
 
         // Elementos da UI
         const loginScreen = document.getElementById('loginScreen');
@@ -738,7 +844,7 @@
         const loginBtn = document.getElementById('loginBtn');
         const registerBtn = document.getElementById('registerBtn');
 
-        // Dados de exemplo para cursos
+        // Dados de cursos do usuário
         let userCourses = [];
 
         // Alternar entre telas de login e registro
@@ -763,7 +869,7 @@
             registerSuccess.classList.add('hidden');
         }
 
-        // Login com Firebase
+        // Login
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('email').value;
@@ -774,34 +880,14 @@
             loginBtn.classList.add('loading');
             
             try {
-                const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                const user = auth.login(email, password);
                 // Login bem-sucedido
-                const user = userCredential.user;
                 loginError.classList.add('hidden');
-                await loadUserData(user.uid);
+                loadUserData(user);
             } catch (error) {
                 // Tratar erros de login
                 console.error('Erro no login:', error);
-                let errorMessage = 'Erro ao fazer login. ';
-                
-                switch (error.code) {
-                    case 'auth/user-not-found':
-                        errorMessage += 'Usuário não encontrado.';
-                        break;
-                    case 'auth/wrong-password':
-                        errorMessage += 'Senha incorreta.';
-                        break;
-                    case 'auth/invalid-email':
-                        errorMessage += 'E-mail inválido.';
-                        break;
-                    case 'auth/user-disabled':
-                        errorMessage += 'Usuário desativado.';
-                        break;
-                    default:
-                        errorMessage += error.message;
-                }
-                
-                loginError.textContent = errorMessage;
+                loginError.textContent = error.message;
                 loginError.classList.remove('hidden');
             } finally {
                 // Restaurar botão
@@ -810,7 +896,7 @@
             }
         });
 
-        // Registro com Firebase
+        // Registro
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = document.getElementById('regName').value;
@@ -823,51 +909,21 @@
             registerBtn.classList.add('loading');
             
             try {
-                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-                // Usuário criado com sucesso
-                const user = userCredential.user;
-                
-                // Salvar dados adicionais no Firestore
-                await db.collection('users').doc(user.uid).set({
-                    name: name,
-                    role: role,
-                    email: email,
-                    isAdmin: false, // Por padrão, novos usuários não são admins
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                const user = auth.register(name, role, email, password);
                 
                 // Registro completo
                 registerError.classList.add('hidden');
                 registerSuccess.textContent = "Conta criada com sucesso! Redirecionando...";
                 registerSuccess.classList.remove('hidden');
                 
-                // Redirecionar para o dashboard após um breve delay
+                // Fazer login automaticamente
                 setTimeout(() => {
-                    registerScreen.classList.add('hidden');
-                    loginScreen.classList.remove('hidden');
-                    registerForm.reset();
-                    registerSuccess.classList.add('hidden');
-                }, 2000);
+                    loadUserData(user);
+                }, 1500);
             } catch (error) {
                 // Tratar erros de registro
                 console.error('Erro no registro:', error);
-                let errorMessage = 'Erro ao criar conta. ';
-                
-                switch (error.code) {
-                    case 'auth/email-already-in-use':
-                        errorMessage = 'Este e-mail já está em uso por outra conta.';
-                        break;
-                    case 'auth/invalid-email':
-                        errorMessage = 'E-mail inválido.';
-                        break;
-                    case 'auth/weak-password':
-                        errorMessage = 'Senha muito fraca. Use pelo menos 6 caracteres.';
-                        break;
-                    default:
-                        errorMessage += error.message;
-                }
-                
-                registerError.textContent = errorMessage;
+                registerError.textContent = error.message;
                 registerError.classList.remove('hidden');
             } finally {
                 // Restaurar botão
@@ -878,14 +934,13 @@
 
         // Logout
         logoutBtn.addEventListener('click', () => {
-            auth.signOut().then(() => {
-                dashboard.classList.add('hidden');
-                loginScreen.classList.remove('hidden');
-                // Limpar formulários
-                loginForm.reset();
-                registerForm.reset();
-                clearMessages();
-            });
+            auth.logout();
+            dashboard.classList.add('hidden');
+            loginScreen.classList.remove('hidden');
+            // Limpar formulários
+            loginForm.reset();
+            registerForm.reset();
+            clearMessages();
         });
 
         // Navegação entre seções
@@ -934,77 +989,50 @@
             const color = document.getElementById('courseColor').value;
             
             try {
-                // Adicionar curso ao Firestore
-                await db.collection('courses').add({
+                // Adicionar curso
+                auth.addCourse({
                     title: title,
                     category: category,
                     description: description,
-                    color: color,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    createdBy: auth.currentUser.uid
+                    color: color
                 });
                 
                 alert('Curso adicionado com sucesso!');
                 addCourseModal.style.display = 'none';
                 addCourseForm.reset();
-                await loadCourses(); // Recarregar cursos
+                loadCourses(); // Recarregar cursos
             } catch (error) {
                 alert('Erro ao adicionar curso: ' + error.message);
             }
         });
 
         // Carregar dados do usuário
-        async function loadUserData(userId) {
-            try {
-                const doc = await db.collection('users').doc(userId).get();
-                if (doc.exists) {
-                    const userData = doc.data();
-                    userName.textContent = userData.name;
-                    userRole.textContent = userData.role;
-                    
-                    // Verificar se o usuário é admin
-                    if (userData.isAdmin) {
-                        adminPanel.classList.remove('hidden');
-                    }
-                    
-                    // Mostrar dashboard
-                    loginScreen.classList.add('hidden');
-                    dashboard.classList.remove('hidden');
-                    
-                    // Carregar cursos
-                    await loadCourses();
-                } else {
-                    console.error("Documento do usuário não encontrado");
-                    loginError.textContent = "Erro ao carregar dados do usuário. Tente novamente.";
-                    loginError.classList.remove('hidden');
-                }
-            } catch (error) {
-                console.error("Erro ao carregar dados do usuário:", error);
-                loginError.textContent = "Erro ao carregar dados. Tente novamente.";
-                loginError.classList.remove('hidden');
+        function loadUserData(user) {
+            userName.textContent = user.name;
+            userRole.textContent = user.role;
+            
+            // Atualizar foto do usuário
+            userPhoto.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=3498db&color=fff`;
+            
+            // Verificar se o usuário é admin
+            if (user.isAdmin) {
+                adminPanel.classList.remove('hidden');
             }
+            
+            // Mostrar dashboard
+            loginScreen.classList.add('hidden');
+            registerScreen.classList.add('hidden');
+            dashboard.classList.remove('hidden');
+            
+            // Carregar cursos
+            loadCourses();
         }
 
-        // Carregar cursos do Firestore
-        async function loadCourses() {
-            try {
-                const querySnapshot = await db.collection('courses').get();
-                userCourses = [];
-                querySnapshot.forEach((doc) => {
-                    const course = doc.data();
-                    course.id = doc.id;
-                    // Adicionar progresso aleatório para demonstração
-                    course.progress = Math.floor(Math.random() * 100);
-                    course.status = course.progress === 100 ? 'completed' : 
-                                   course.progress > 0 ? 'in-progress' : 'pending';
-                    userCourses.push(course);
-                });
-                renderCourses('all');
-                updateStats();
-            } catch (error) {
-                console.error("Erro ao carregar cursos:", error);
-                coursesGrid.innerHTML = '<p>Erro ao carregar cursos. Tente recarregar a página.</p>';
-            }
+        // Carregar cursos
+        function loadCourses() {
+            userCourses = auth.getCourses();
+            renderCourses('all');
+            updateStats();
         }
 
         // Renderizar cursos
@@ -1062,10 +1090,29 @@
             });
             
             // Adicionar event listeners aos botões dos cursos
-            document.querySelectorAll('.continue-btn, .start-btn, .certificate-btn, .details-btn').forEach(btn => {
+            document.querySelectorAll('.continue-btn, .start-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const courseId = e.target.getAttribute('data-id');
-                    handleCourseAction(courseId, e.target.classList.contains('details-btn'));
+                    const newProgress = Math.min(100, userCourses.find(c => c.id === courseId).progress + 25);
+                    auth.updateCourseProgress(courseId, newProgress);
+                    loadCourses();
+                    alert(`Progresso do curso atualizado para ${newProgress}%`);
+                });
+            });
+
+            document.querySelectorAll('.certificate-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const courseId = e.target.getAttribute('data-id');
+                    const course = userCourses.find(c => c.id === courseId);
+                    alert(`Parabéns! Você concluiu o curso "${course.title}".\n\nSeu certificado está disponível para download.`);
+                });
+            });
+
+            document.querySelectorAll('.details-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const courseId = e.target.getAttribute('data-id');
+                    const course = userCourses.find(c => c.id === courseId);
+                    alert(`Detalhes do curso: ${course.title}\n\n${course.description}\n\nProgresso: ${course.progress}%`);
                 });
             });
         }
@@ -1082,24 +1129,8 @@
             document.getElementById('averageProgress').textContent = `${averageProgress}%`;
             
             // Calcular horas completadas (exemplo: 1 hora por curso completado)
-            const completedHours = completedCourses;
+            const completedHours = completedCourses * 4; // 4 horas por curso
             document.getElementById('completedHours').textContent = completedHours;
-        }
-
-        // Manipular ações dos cursos
-        function handleCourseAction(courseId, isDetails = false) {
-            const course = userCourses.find(c => c.id === courseId);
-            
-            if (isDetails) {
-                alert(`Detalhes do curso: ${course.title}\n\n${course.description}\n\nProgresso: ${course.progress}%`);
-            } else {
-                if (course.progress === 100) {
-                    alert(`Parabéns! Você concluiu o curso "${course.title}".\n\nSeu certificado está disponível para download.`);
-                } else {
-                    alert(`Abrindo o curso: ${course.title}`);
-                    // Aqui você implementaria a lógica para abrir o curso
-                }
-            }
         }
 
         // Ações do painel administrativo
@@ -1115,22 +1146,19 @@
             alert('Funcionalidade: Configurações do sistema\n\nEsta funcionalidade permitiria configurar parâmetros do sistema.');
         });
 
-        // Verificar estado de autenticação ao carregar a página
-        auth.onAuthStateChanged((user) => {
-            if (user) {
-                // Usuário está logado
-                console.log('Usuário logado:', user.email);
-                loadUserData(user.uid);
+        // Verificar se usuário já está logado ao carregar a página
+        document.addEventListener('DOMContentLoaded', () => {
+            if (auth.currentUser) {
+                loadUserData(auth.currentUser);
             } else {
-                // Usuário não está logado
-                console.log('Nenhum usuário logado');
                 dashboard.classList.add('hidden');
                 loginScreen.classList.remove('hidden');
             }
-        });
 
-        // Preencher e-mail de teste para facilitar
-        document.getElementById('email').value = 'samuel.bagolin@setuptecnologia.com.br';
+            // Preencher e-mail de teste para facilitar
+            document.getElementById('email').value = 'samuel.bagolin@setuptecnologia.com.br';
+            document.getElementById('password').value = '123456';
+        });
     </script>
 </body>
 </html>
