@@ -121,6 +121,10 @@
             margin-top: 10px;
             text-align: center;
             font-size: 0.9rem;
+            padding: 10px;
+            background-color: #ffeaea;
+            border-radius: 5px;
+            border: 1px solid #ffcccc;
         }
         
         .success-message {
@@ -128,10 +132,19 @@
             margin-top: 10px;
             text-align: center;
             font-size: 0.9rem;
+            padding: 10px;
+            background-color: #eaffea;
+            border-radius: 5px;
+            border: 1px solid #ccffcc;
         }
         
         .hidden {
             display: none;
+        }
+        
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
         }
         
         /* Estilos do dashboard */
@@ -482,13 +495,13 @@
             <form id="loginForm">
                 <div class="form-group">
                     <label for="email">E-mail</label>
-                    <input type="email" id="email" class="form-control" placeholder="seu@email.com" required>
+                    <input type="email" id="email" class="form-control" placeholder="seu@email.com" required value="samuel.bagolin@setuptecnologia.com.br">
                 </div>
                 <div class="form-group">
                     <label for="password">Senha</label>
                     <input type="password" id="password" class="form-control" placeholder="Sua senha" required>
                 </div>
-                <button type="submit" class="btn btn-primary">Entrar</button>
+                <button type="submit" class="btn btn-primary" id="loginBtn">Entrar</button>
                 <div id="loginError" class="error-message hidden"></div>
             </form>
             <div class="form-group" style="margin-top: 20px; text-align: center;">
@@ -518,7 +531,7 @@
                     <label for="regPassword">Senha</label>
                     <input type="password" id="regPassword" class="form-control" placeholder="Mínimo 6 caracteres" required>
                 </div>
-                <button type="submit" class="btn btn-primary">Cadastrar</button>
+                <button type="submit" class="btn btn-primary" id="registerBtn">Cadastrar</button>
                 <div id="registerError" class="error-message hidden"></div>
                 <div id="registerSuccess" class="success-message hidden"></div>
             </form>
@@ -540,8 +553,8 @@
                     <div class="user-info">
                         <img id="userPhoto" src="https://via.placeholder.com/150" alt="Foto do colaborador">
                         <div class="user-details">
-                            <div id="userName" class="user-name">João Silva</div>
-                            <div id="userRole" class="user-role">Analista de Marketing</div>
+                            <div id="userName" class="user-name">Carregando...</div>
+                            <div id="userRole" class="user-role">Carregando...</div>
                         </div>
                         <button id="logoutBtn" class="logout-btn" title="Sair">🚪</button>
                     </div>
@@ -587,25 +600,25 @@
                         
                         <div class="stats-container">
                             <div class="stat-card">
-                                <div id="activeCourses" class="stat-value">5</div>
+                                <div id="activeCourses" class="stat-value">0</div>
                                 <div class="stat-label">Cursos Ativos</div>
                             </div>
                             <div class="stat-card">
-                                <div id="completedHours" class="stat-value">12</div>
+                                <div id="completedHours" class="stat-value">0</div>
                                 <div class="stat-label">Horas Concluídas</div>
                             </div>
                             <div class="stat-card">
-                                <div id="certificates" class="stat-value">3</div>
+                                <div id="certificates" class="stat-value">0</div>
                                 <div class="stat-label">Certificados</div>
                             </div>
                             <div class="stat-card">
-                                <div id="averageProgress" class="stat-value">75%</div>
+                                <div id="averageProgress" class="stat-value">0%</div>
                                 <div class="stat-label">Progresso Médio</div>
                             </div>
                         </div>
                         
                         <div id="coursesGrid" class="courses-grid">
-                            <!-- Cursos serão carregados dinamicamente -->
+                            <p>Carregando cursos...</p>
                         </div>
                     </div>
                     
@@ -722,6 +735,8 @@
         const addCourseModal = document.getElementById('addCourseModal');
         const addCourseForm = document.getElementById('addCourseForm');
         const closeModalBtn = document.querySelector('.close-btn');
+        const loginBtn = document.getElementById('loginBtn');
+        const registerBtn = document.getElementById('registerBtn');
 
         // Dados de exemplo para cursos
         let userCourses = [];
@@ -731,75 +746,134 @@
             e.preventDefault();
             loginScreen.classList.add('hidden');
             registerScreen.classList.remove('hidden');
+            clearMessages();
         });
 
         showLogin.addEventListener('click', (e) => {
             e.preventDefault();
             registerScreen.classList.add('hidden');
             loginScreen.classList.remove('hidden');
+            clearMessages();
         });
 
+        // Limpar mensagens de erro/sucesso
+        function clearMessages() {
+            loginError.classList.add('hidden');
+            registerError.classList.add('hidden');
+            registerSuccess.classList.add('hidden');
+        }
+
         // Login com Firebase
-        loginForm.addEventListener('submit', (e) => {
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             
-            auth.signInWithEmailAndPassword(email, password)
-                .then((userCredential) => {
-                    // Login bem-sucedido
-                    const user = userCredential.user;
-                    loginError.classList.add('hidden');
-                    loadUserData(user.uid);
-                })
-                .catch((error) => {
-                    // Tratar erros de login
-                    loginError.textContent = error.message;
-                    loginError.classList.remove('hidden');
-                });
+            // Mostrar loading
+            loginBtn.textContent = 'Entrando...';
+            loginBtn.classList.add('loading');
+            
+            try {
+                const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                // Login bem-sucedido
+                const user = userCredential.user;
+                loginError.classList.add('hidden');
+                await loadUserData(user.uid);
+            } catch (error) {
+                // Tratar erros de login
+                console.error('Erro no login:', error);
+                let errorMessage = 'Erro ao fazer login. ';
+                
+                switch (error.code) {
+                    case 'auth/user-not-found':
+                        errorMessage += 'Usuário não encontrado.';
+                        break;
+                    case 'auth/wrong-password':
+                        errorMessage += 'Senha incorreta.';
+                        break;
+                    case 'auth/invalid-email':
+                        errorMessage += 'E-mail inválido.';
+                        break;
+                    case 'auth/user-disabled':
+                        errorMessage += 'Usuário desativado.';
+                        break;
+                    default:
+                        errorMessage += error.message;
+                }
+                
+                loginError.textContent = errorMessage;
+                loginError.classList.remove('hidden');
+            } finally {
+                // Restaurar botão
+                loginBtn.textContent = 'Entrar';
+                loginBtn.classList.remove('loading');
+            }
         });
 
         // Registro com Firebase
-        registerForm.addEventListener('submit', (e) => {
+        registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = document.getElementById('regName').value;
             const role = document.getElementById('regRole').value;
             const email = document.getElementById('regEmail').value;
             const password = document.getElementById('regPassword').value;
             
-            auth.createUserWithEmailAndPassword(email, password)
-                .then((userCredential) => {
-                    // Usuário criado com sucesso
-                    const user = userCredential.user;
-                    
-                    // Salvar dados adicionais no Firestore
-                    return db.collection('users').doc(user.uid).set({
-                        name: name,
-                        role: role,
-                        email: email,
-                        isAdmin: false, // Por padrão, novos usuários não são admins
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                })
-                .then(() => {
-                    // Registro completo
-                    registerError.classList.add('hidden');
-                    registerSuccess.textContent = "Conta criada com sucesso! Redirecionando...";
-                    registerSuccess.classList.remove('hidden');
-                    
-                    // Redirecionar para o dashboard após um breve delay
-                    setTimeout(() => {
-                        registerScreen.classList.add('hidden');
-                        loginScreen.classList.remove('hidden');
-                        registerForm.reset();
-                        registerSuccess.classList.add('hidden');
-                    }, 2000);
-                })
-                .catch((error) => {
-                    // Tratar erros de registro
-                    registerError.textContent = error.message;
-                    registerError.classList.remove('hidden');
+            // Mostrar loading
+            registerBtn.textContent = 'Cadastrando...';
+            registerBtn.classList.add('loading');
+            
+            try {
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                // Usuário criado com sucesso
+                const user = userCredential.user;
+                
+                // Salvar dados adicionais no Firestore
+                await db.collection('users').doc(user.uid).set({
+                    name: name,
+                    role: role,
+                    email: email,
+                    isAdmin: false, // Por padrão, novos usuários não são admins
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+                
+                // Registro completo
+                registerError.classList.add('hidden');
+                registerSuccess.textContent = "Conta criada com sucesso! Redirecionando...";
+                registerSuccess.classList.remove('hidden');
+                
+                // Redirecionar para o dashboard após um breve delay
+                setTimeout(() => {
+                    registerScreen.classList.add('hidden');
+                    loginScreen.classList.remove('hidden');
+                    registerForm.reset();
+                    registerSuccess.classList.add('hidden');
+                }, 2000);
+            } catch (error) {
+                // Tratar erros de registro
+                console.error('Erro no registro:', error);
+                let errorMessage = 'Erro ao criar conta. ';
+                
+                switch (error.code) {
+                    case 'auth/email-already-in-use':
+                        errorMessage = 'Este e-mail já está em uso por outra conta.';
+                        break;
+                    case 'auth/invalid-email':
+                        errorMessage = 'E-mail inválido.';
+                        break;
+                    case 'auth/weak-password':
+                        errorMessage = 'Senha muito fraca. Use pelo menos 6 caracteres.';
+                        break;
+                    default:
+                        errorMessage += error.message;
+                }
+                
+                registerError.textContent = errorMessage;
+                registerError.classList.remove('hidden');
+            } finally {
+                // Restaurar botão
+                registerBtn.textContent = 'Cadastrar';
+                registerBtn.classList.remove('loading');
+            }
         });
 
         // Logout
@@ -807,6 +881,10 @@
             auth.signOut().then(() => {
                 dashboard.classList.add('hidden');
                 loginScreen.classList.remove('hidden');
+                // Limpar formulários
+                loginForm.reset();
+                registerForm.reset();
+                clearMessages();
             });
         });
 
@@ -848,80 +926,85 @@
         });
 
         // Adicionar novo curso
-        addCourseForm.addEventListener('submit', (e) => {
+        addCourseForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const title = document.getElementById('courseTitle').value;
             const category = document.getElementById('courseCategory').value;
             const description = document.getElementById('courseDescription').value;
             const color = document.getElementById('courseColor').value;
             
-            // Adicionar curso ao Firestore
-            db.collection('courses').add({
-                title: title,
-                category: category,
-                description: description,
-                color: color,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                createdBy: auth.currentUser.uid
-            })
-            .then(() => {
+            try {
+                // Adicionar curso ao Firestore
+                await db.collection('courses').add({
+                    title: title,
+                    category: category,
+                    description: description,
+                    color: color,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdBy: auth.currentUser.uid
+                });
+                
                 alert('Curso adicionado com sucesso!');
                 addCourseModal.style.display = 'none';
                 addCourseForm.reset();
-                loadCourses(); // Recarregar cursos
-            })
-            .catch((error) => {
+                await loadCourses(); // Recarregar cursos
+            } catch (error) {
                 alert('Erro ao adicionar curso: ' + error.message);
-            });
+            }
         });
 
         // Carregar dados do usuário
-        function loadUserData(userId) {
-            db.collection('users').doc(userId).get()
-                .then((doc) => {
-                    if (doc.exists) {
-                        const userData = doc.data();
-                        userName.textContent = userData.name;
-                        userRole.textContent = userData.role;
-                        
-                        // Verificar se o usuário é admin
-                        if (userData.isAdmin) {
-                            adminPanel.classList.remove('hidden');
-                        }
-                        
-                        // Mostrar dashboard
-                        loginScreen.classList.add('hidden');
-                        dashboard.classList.remove('hidden');
-                        
-                        // Carregar cursos
-                        loadCourses();
+        async function loadUserData(userId) {
+            try {
+                const doc = await db.collection('users').doc(userId).get();
+                if (doc.exists) {
+                    const userData = doc.data();
+                    userName.textContent = userData.name;
+                    userRole.textContent = userData.role;
+                    
+                    // Verificar se o usuário é admin
+                    if (userData.isAdmin) {
+                        adminPanel.classList.remove('hidden');
                     }
-                })
-                .catch((error) => {
-                    console.error("Erro ao carregar dados do usuário:", error);
-                });
+                    
+                    // Mostrar dashboard
+                    loginScreen.classList.add('hidden');
+                    dashboard.classList.remove('hidden');
+                    
+                    // Carregar cursos
+                    await loadCourses();
+                } else {
+                    console.error("Documento do usuário não encontrado");
+                    loginError.textContent = "Erro ao carregar dados do usuário. Tente novamente.";
+                    loginError.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error("Erro ao carregar dados do usuário:", error);
+                loginError.textContent = "Erro ao carregar dados. Tente novamente.";
+                loginError.classList.remove('hidden');
+            }
         }
 
         // Carregar cursos do Firestore
-        function loadCourses() {
-            db.collection('courses').get()
-                .then((querySnapshot) => {
-                    userCourses = [];
-                    querySnapshot.forEach((doc) => {
-                        const course = doc.data();
-                        course.id = doc.id;
-                        // Adicionar progresso aleatório para demonstração
-                        course.progress = Math.floor(Math.random() * 100);
-                        course.status = course.progress === 100 ? 'completed' : 
-                                       course.progress > 0 ? 'in-progress' : 'pending';
-                        userCourses.push(course);
-                    });
-                    renderCourses('all');
-                    updateStats();
-                })
-                .catch((error) => {
-                    console.error("Erro ao carregar cursos:", error);
+        async function loadCourses() {
+            try {
+                const querySnapshot = await db.collection('courses').get();
+                userCourses = [];
+                querySnapshot.forEach((doc) => {
+                    const course = doc.data();
+                    course.id = doc.id;
+                    // Adicionar progresso aleatório para demonstração
+                    course.progress = Math.floor(Math.random() * 100);
+                    course.status = course.progress === 100 ? 'completed' : 
+                                   course.progress > 0 ? 'in-progress' : 'pending';
+                    userCourses.push(course);
                 });
+                renderCourses('all');
+                updateStats();
+            } catch (error) {
+                console.error("Erro ao carregar cursos:", error);
+                coursesGrid.innerHTML = '<p>Erro ao carregar cursos. Tente recarregar a página.</p>';
+            }
         }
 
         // Renderizar cursos
@@ -997,6 +1080,10 @@
             document.getElementById('activeCourses').textContent = activeCourses;
             document.getElementById('certificates').textContent = completedCourses;
             document.getElementById('averageProgress').textContent = `${averageProgress}%`;
+            
+            // Calcular horas completadas (exemplo: 1 hora por curso completado)
+            const completedHours = completedCourses;
+            document.getElementById('completedHours').textContent = completedHours;
         }
 
         // Manipular ações dos cursos
@@ -1032,13 +1119,18 @@
         auth.onAuthStateChanged((user) => {
             if (user) {
                 // Usuário está logado
+                console.log('Usuário logado:', user.email);
                 loadUserData(user.uid);
             } else {
                 // Usuário não está logado
+                console.log('Nenhum usuário logado');
                 dashboard.classList.add('hidden');
                 loginScreen.classList.remove('hidden');
             }
         });
+
+        // Preencher e-mail de teste para facilitar
+        document.getElementById('email').value = 'samuel.bagolin@setuptecnologia.com.br';
     </script>
 </body>
 </html>
