@@ -3,41 +3,690 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Capacitação - Desenvolvimento Profissional</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Ícones -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Firebase -->
-    <script type="module">
-        // Firebase App (the core Firebase SDK) is always required and must be listed first
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { 
-            getAuth, 
-            GoogleAuthProvider, 
-            signInWithPopup, 
-            signOut,
-            onAuthStateChanged 
-        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
-        import { 
-            getFirestore,
-            collection,
-            doc,
-            getDoc,
-            getDocs,
-            setDoc,
-            updateDoc,
-            deleteDoc,
-            arrayUnion,
-            arrayRemove,
-            query,
-            where
-        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    <title>Portal de Desenvolvimento Profissional</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --light-color: #ecf0f1;
+            --dark-color: #34495e;
+            --success-color: #2ecc71;
+            --warning-color: #f39c12;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: var(--dark-color);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Estilos da tela de login */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        }
+        
+        .login-box {
+            background-color: white;
+            border-radius: 10px;
+            padding: 40px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .login-title {
+            text-align: center;
+            margin-bottom: 30px;
+            color: var(--primary-color);
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--dark-color);
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        
+        .form-control:focus {
+            border-color: var(--secondary-color);
+            outline: none;
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+            width: 100%;
+            font-size: 1rem;
+        }
+        
+        .btn-primary {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+        
+        .btn-secondary {
+            background-color: var(--light-color);
+            color: var(--dark-color);
+        }
+        
+        .btn-secondary:hover {
+            background-color: #d5dbdb;
+        }
+        
+        .error-message {
+            color: var(--accent-color);
+            margin-top: 10px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        
+        .success-message {
+            color: var(--success-color);
+            margin-top: 10px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        /* Estilos do dashboard */
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .logo img {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background-color: rgba(255, 255, 255, 0.2);
+            padding: 10px 15px;
+            border-radius: 30px;
+        }
+        
+        .user-info img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid white;
+        }
+        
+        .user-details {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .user-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        
+        .user-role {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .logout-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.2rem;
+            margin-left: 10px;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 3fr;
+            gap: 20px;
+            margin-top: 30px;
+        }
+        
+        .sidebar {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        
+        .sidebar h3 {
+            margin-bottom: 15px;
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--light-color);
+            padding-bottom: 10px;
+        }
+        
+        .nav-item {
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .nav-item:hover {
+            background-color: var(--light-color);
+        }
+        
+        .nav-item.active {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        
+        .main-content {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        
+        .section-title {
+            margin-bottom: 20px;
+            color: var(--primary-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .courses-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .course-card {
+            border: 1px solid var(--light-color);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .course-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .course-image {
+            height: 150px;
+            background-color: var(--secondary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        
+        .course-content {
+            padding: 15px;
+        }
+        
+        .course-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+        
+        .course-description {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        
+        .progress-container {
+            margin-bottom: 15px;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background-color: var(--light-color);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress {
+            height: 100%;
+            background-color: var(--success-color);
+            border-radius: 4px;
+        }
+        
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            margin-top: 5px;
+        }
+        
+        .course-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--secondary-color);
+            color: var(--secondary-color);
+            width: auto;
+            padding: 8px 15px;
+        }
+        
+        .btn-outline:hover {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--secondary-color);
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .admin-panel {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 30px;
+            border: 1px dashed var(--secondary-color);
+        }
+        
+        .admin-panel h3 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+        
+        .admin-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .admin-btn {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+            width: auto;
+        }
+        
+        .admin-btn:hover {
+            background-color: #c0392b;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9rem;
+            border-top: 1px solid var(--light-color);
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .courses-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .admin-actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Tela de Login -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-box">
+            <h1 class="login-title">Portal de Desenvolvimento</h1>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">E-mail</label>
+                    <input type="email" id="email" class="form-control" placeholder="seu@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Senha</label>
+                    <input type="password" id="password" class="form-control" placeholder="Sua senha" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Entrar</button>
+                <div id="loginError" class="error-message hidden"></div>
+            </form>
+            <div class="form-group" style="margin-top: 20px; text-align: center;">
+                <p>Não tem uma conta? <a href="#" id="showRegister">Cadastre-se</a></p>
+            </div>
+        </div>
+    </div>
 
-        // SUA CONFIGURAÇÃO DO FIREBASE
+    <!-- Tela de Registro -->
+    <div id="registerScreen" class="login-container hidden">
+        <div class="login-box">
+            <h1 class="login-title">Criar Conta</h1>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="regName">Nome Completo</label>
+                    <input type="text" id="regName" class="form-control" placeholder="Seu nome completo" required>
+                </div>
+                <div class="form-group">
+                    <label for="regRole">Cargo</label>
+                    <input type="text" id="regRole" class="form-control" placeholder="Seu cargo" required>
+                </div>
+                <div class="form-group">
+                    <label for="regEmail">E-mail</label>
+                    <input type="email" id="regEmail" class="form-control" placeholder="seu@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="regPassword">Senha</label>
+                    <input type="password" id="regPassword" class="form-control" placeholder="Mínimo 6 caracteres" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Cadastrar</button>
+                <div id="registerError" class="error-message hidden"></div>
+                <div id="registerSuccess" class="success-message hidden"></div>
+            </form>
+            <div class="form-group" style="margin-top: 20px; text-align: center;">
+                <p>Já tem uma conta? <a href="#" id="showLogin">Faça login</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard (após login) -->
+    <div id="dashboard" class="hidden">
+        <header>
+            <div class="container">
+                <div class="header-content">
+                    <div class="logo">
+                        <div class="logo-placeholder">LOGO</div>
+                        <h1>Portal de Desenvolvimento</h1>
+                    </div>
+                    <div class="user-info">
+                        <img id="userPhoto" src="https://via.placeholder.com/150" alt="Foto do colaborador">
+                        <div class="user-details">
+                            <div id="userName" class="user-name">João Silva</div>
+                            <div id="userRole" class="user-role">Analista de Marketing</div>
+                        </div>
+                        <button id="logoutBtn" class="logout-btn" title="Sair">🚪</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <div class="container">
+            <div class="dashboard">
+                <div class="sidebar">
+                    <h3>Menu</h3>
+                    <div class="nav-item active" data-section="courses">
+                        <span>📚</span> Meus Cursos
+                    </div>
+                    <div class="nav-item" data-section="progress">
+                        <span>📊</span> Progresso
+                    </div>
+                    <div class="nav-item" data-section="achievements">
+                        <span>🏆</span> Conquistas
+                    </div>
+                    <div class="nav-item" data-section="team">
+                        <span>👥</span> Equipe
+                    </div>
+                    <div class="nav-item" data-section="settings">
+                        <span>⚙️</span> Configurações
+                    </div>
+                </div>
+                
+                <div class="main-content">
+                    <!-- Seção de Cursos -->
+                    <div id="coursesSection" class="section">
+                        <div class="section-title">
+                            <h2>Meus Cursos</h2>
+                            <div class="filter">
+                                <select id="courseFilter">
+                                    <option value="all">Todos os cursos</option>
+                                    <option value="in-progress">Em andamento</option>
+                                    <option value="completed">Concluídos</option>
+                                    <option value="pending">Pendentes</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="stats-container">
+                            <div class="stat-card">
+                                <div id="activeCourses" class="stat-value">5</div>
+                                <div class="stat-label">Cursos Ativos</div>
+                            </div>
+                            <div class="stat-card">
+                                <div id="completedHours" class="stat-value">12</div>
+                                <div class="stat-label">Horas Concluídas</div>
+                            </div>
+                            <div class="stat-card">
+                                <div id="certificates" class="stat-value">3</div>
+                                <div class="stat-label">Certificados</div>
+                            </div>
+                            <div class="stat-card">
+                                <div id="averageProgress" class="stat-value">75%</div>
+                                <div class="stat-label">Progresso Médio</div>
+                            </div>
+                        </div>
+                        
+                        <div id="coursesGrid" class="courses-grid">
+                            <!-- Cursos serão carregados dinamicamente -->
+                        </div>
+                    </div>
+                    
+                    <!-- Outras seções (inicialmente ocultas) -->
+                    <div id="progressSection" class="section hidden">
+                        <h2>Meu Progresso</h2>
+                        <p>Visualização detalhada do seu progresso nos cursos.</p>
+                    </div>
+                    
+                    <div id="achievementsSection" class="section hidden">
+                        <h2>Minhas Conquistas</h2>
+                        <p>Badges e certificados conquistados.</p>
+                    </div>
+                    
+                    <div id="teamSection" class="section hidden">
+                        <h2>Equipe</h2>
+                        <p>Visualização dos membros da equipe e seus progressos.</p>
+                    </div>
+                    
+                    <div id="settingsSection" class="section hidden">
+                        <h2>Configurações</h2>
+                        <p>Configurações da sua conta.</p>
+                    </div>
+                    
+                    <!-- Painel de Administração (visível apenas para admins) -->
+                    <div id="adminPanel" class="admin-panel hidden">
+                        <h3>Painel de Administração</h3>
+                        <p>Como administrador, você pode gerenciar cursos e colaboradores.</p>
+                        <div class="admin-actions">
+                            <button class="admin-btn" id="addCourseBtn">Adicionar Novo Curso</button>
+                            <button class="admin-btn" id="manageUsersBtn">Gerenciar Colaboradores</button>
+                            <button class="admin-btn" id="reportsBtn">Relatórios de Progresso</button>
+                            <button class="admin-btn" id="systemSettingsBtn">Configurações do Sistema</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <div class="container">
+                <p>Portal de Desenvolvimento Profissional &copy; 2023 - Todos os direitos reservados</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modal para Adicionar Curso -->
+    <div id="addCourseModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Adicionar Novo Curso</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="addCourseForm">
+                <div class="form-group">
+                    <label for="courseTitle">Título do Curso</label>
+                    <input type="text" id="courseTitle" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="courseCategory">Categoria</label>
+                    <input type="text" id="courseCategory" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="courseDescription">Descrição</label>
+                    <textarea id="courseDescription" class="form-control" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="courseColor">Cor do Curso</label>
+                    <input type="color" id="courseColor" class="form-control" value="#3498db">
+                </div>
+                <button type="submit" class="btn btn-primary">Adicionar Curso</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Configuração do Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyBrYUi-4NNEfBulesb-TzPc6o69PnUpadI",
             authDomain: "sistema-jornada-colaborador.firebaseapp.com",
+            databaseURL: "https://sistema-jornada-colaborador-default-rtdb.firebaseio.com",
             projectId: "sistema-jornada-colaborador",
             storageBucket: "sistema-jornada-colaborador.firebasestorage.app",
             messagingSenderId: "883814857933",
@@ -45,558 +694,351 @@
             measurementId: "G-1GT7JJWJ0G"
         };
 
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        
-        // Configurar provider do Google
-        const provider = new GoogleAuthProvider();
-        provider.addScope('email');
-        provider.addScope('profile');
-        provider.setCustomParameters({
-            prompt: 'select_account'
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Elementos da UI
+        const loginScreen = document.getElementById('loginScreen');
+        const registerScreen = document.getElementById('registerScreen');
+        const dashboard = document.getElementById('dashboard');
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const loginError = document.getElementById('loginError');
+        const registerError = document.getElementById('registerError');
+        const registerSuccess = document.getElementById('registerSuccess');
+        const showRegister = document.getElementById('showRegister');
+        const showLogin = document.getElementById('showLogin');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const userName = document.getElementById('userName');
+        const userRole = document.getElementById('userRole');
+        const userPhoto = document.getElementById('userPhoto');
+        const adminPanel = document.getElementById('adminPanel');
+        const coursesGrid = document.getElementById('coursesGrid');
+        const courseFilter = document.getElementById('courseFilter');
+        const navItems = document.querySelectorAll('.nav-item');
+        const sections = document.querySelectorAll('.section');
+        const addCourseModal = document.getElementById('addCourseModal');
+        const addCourseForm = document.getElementById('addCourseForm');
+        const closeModalBtn = document.querySelector('.close-btn');
+
+        // Dados de exemplo para cursos
+        let userCourses = [];
+
+        // Alternar entre telas de login e registro
+        showRegister.addEventListener('click', (e) => {
+            e.preventDefault();
+            loginScreen.classList.add('hidden');
+            registerScreen.classList.remove('hidden');
         });
 
-        // ========== FUNÇÕES FIREBASE ==========
-        
-        // Função para verificar configuração do Firebase
-        function checkFirebaseConfig() {
-            console.log('=== VERIFICAÇÃO FIREBASE ===');
-            console.log('Project ID:', firebaseConfig.projectId);
-            console.log('Auth Domain:', firebaseConfig.authDomain);
-            console.log('API Key:', firebaseConfig.apiKey ? '✓ Configurada' : '✗ Faltando');
-            console.log('Domínio atual:', window.location.hostname);
+        showLogin.addEventListener('click', (e) => {
+            e.preventDefault();
+            registerScreen.classList.add('hidden');
+            loginScreen.classList.remove('hidden');
+        });
+
+        // Login com Firebase
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
             
-            try {
-                const currentUser = auth.currentUser;
-                console.log('Usuário atual:', currentUser);
-                console.log('Auth inicializado:', !!auth);
-            } catch (error) {
-                console.error('Erro ao acessar auth:', error);
-            }
-            console.log('=== FIM VERIFICAÇÃO ===');
-        }
-
-        // Função de login com Google - Versão Corrigida
-        async function loginWithGoogle() {
-            try {
-                console.log('🔐 Iniciando login com Google...');
-                
-                const result = await signInWithPopup(auth, provider);
-                const user = result.user;
-                
-                console.log('✅ Usuário autenticado:', {
-                    uid: user.uid,
-                    email: user.email,
-                    displayName: user.displayName
-                });
-                
-                // Verificar se usuário já existe no Firestore
-                const userDocRef = doc(db, 'users', user.uid);
-                const userDoc = await getDoc(userDocRef);
-                
-                if (!userDoc.exists()) {
-                    console.log('📝 Criando novo usuário no Firestore...');
-                    // Criar novo usuário (padrão como aluno)
-                    await setDoc(userDocRef, {
-                        nome: user.displayName || 'Usuário',
-                        email: user.email,
-                        fotoURL: user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=100&q=80',
-                        tipo: 'aluno',
-                        cargo: 'A definir',
-                        setor: 'A definir',
-                        progresso: [],
-                        telefone: '',
-                        dataNascimento: '',
-                        dataAdmissao: new Date().toISOString().split('T')[0],
-                        gestor: '',
-                        criadoEm: new Date(),
-                        ultimoAcesso: new Date()
-                    });
-                    console.log('✅ Novo usuário criado com sucesso');
-                } else {
-                    console.log('ℹ️ Usuário já existe no Firestore');
-                    // Atualizar último acesso
-                    await updateDoc(userDocRef, {
-                        ultimoAcesso: new Date()
-                    });
-                }
-                
-                return user;
-            } catch (error) {
-                console.error('❌ Erro detalhado no login:', error);
-                console.error('Código do erro:', error.code);
-                console.error('Mensagem do erro:', error.message);
-                
-                // Tratamento específico de erros comuns
-                let errorMessage = 'Erro ao fazer login. Tente novamente.';
-                
-                switch (error.code) {
-                    case 'auth/popup-blocked':
-                        errorMessage = 'Popup bloqueado pelo navegador. Por favor, permita popups para este site.';
-                        break;
-                    case 'auth/popup-closed-by-user':
-                        errorMessage = 'Login cancelado pelo usuário.';
-                        break;
-                    case 'auth/unauthorized-domain':
-                        errorMessage = 'Domínio não autorizado. Verifique as configurações do Firebase Console.';
-                        console.error('Domínio atual:', window.location.hostname);
-                        break;
-                    case 'auth/operation-not-allowed':
-                        errorMessage = 'Login com Google não está habilitado. Verifique as configurações do Firebase.';
-                        break;
-                    case 'auth/network-request-failed':
-                        errorMessage = 'Erro de rede. Verifique sua conexão com a internet.';
-                        break;
-                    default:
-                        errorMessage = error.message || 'Erro desconhecido ao fazer login.';
-                }
-                
-                throw new Error(errorMessage);
-            }
-        }
-
-        // Função para obter dados do usuário
-        async function getUserData(userId) {
-            try {
-                const userDoc = await getDoc(doc(db, 'users', userId));
-                if (userDoc.exists()) {
-                    return { id: userDoc.id, ...userDoc.data() };
-                }
-                return null;
-            } catch (error) {
-                console.error('Erro ao buscar dados do usuário:', error);
-                return null;
-            }
-        }
-
-        // Função para atualizar perfil
-        async function updateUserProfile(userId, updates) {
-            await updateDoc(doc(db, 'users', userId), updates);
-        }
-
-        // Função para obter trilhas
-        async function getTrilhas() {
-            try {
-                const querySnapshot = await getDocs(collection(db, 'trilhas'));
-                const trilhas = [];
-                querySnapshot.forEach((doc) => {
-                    trilhas.push({ id: doc.id, ...doc.data() });
-                });
-                return trilhas;
-            } catch (error) {
-                console.error('Erro ao buscar trilhas:', error);
-                return [];
-            }
-        }
-
-        // Função para criar trilha (apenas professores)
-        async function createTrilha(trilhaData) {
-            const newTrilhaRef = doc(collection(db, 'trilhas'));
-            await setDoc(newTrilhaRef, {
-                ...trilhaData,
-                criadoEm: new Date(),
-                criadoPor: auth.currentUser.uid
-            });
-            return newTrilhaRef.id;
-        }
-
-        // Função para excluir trilha (apenas professores)
-        async function deleteTrilha(trilhaId) {
-            await deleteDoc(doc(db, 'trilhas', trilhaId));
-        }
-
-        // Função para obter cursos
-        async function getCursos() {
-            try {
-                const querySnapshot = await getDocs(collection(db, 'cursos'));
-                const cursos = [];
-                querySnapshot.forEach((doc) => {
-                    cursos.push({ id: doc.id, ...doc.data() });
-                });
-                return cursos;
-            } catch (error) {
-                console.error('Erro ao buscar cursos:', error);
-                return [];
-            }
-        }
-
-        // Função para criar curso (apenas professores)
-        async function createCurso(cursoData) {
-            const newCursoRef = doc(collection(db, 'cursos'));
-            await setDoc(newCursoRef, {
-                ...cursoData,
-                criadoEm: new Date(),
-                criadoPor: auth.currentUser.uid
-            });
-            return newCursoRef.id;
-        }
-
-        // Função para obter alunos (apenas professores)
-        async function getAlunos() {
-            try {
-                const q = query(collection(db, 'users'), where('tipo', '==', 'aluno'));
-                const querySnapshot = await getDocs(q);
-                const alunos = [];
-                querySnapshot.forEach((doc) => {
-                    alunos.push({ id: doc.id, ...doc.data() });
-                });
-                return alunos;
-            } catch (error) {
-                console.error('Erro ao buscar alunos:', error);
-                return [];
-            }
-        }
-
-        // Função para cadastrar usuário manualmente (apenas professores)
-        async function createUser(userData) {
-            const newUserRef = doc(collection(db, 'users'));
-            await setDoc(newUserRef, {
-                ...userData,
-                progresso: [],
-                criadoEm: new Date(),
-                criadoPor: auth.currentUser.uid
-            });
-            return newUserRef.id;
-        }
-
-        // Função para excluir usuário (apenas professores)
-        async function deleteUser(userId) {
-            await deleteDoc(doc(db, 'users', userId));
-        }
-
-        // Função para atualizar progresso do aluno
-        async function updateProgresso(userId, cursoId, concluido) {
-            if (concluido) {
-                await updateDoc(doc(db, 'users', userId), {
-                    progresso: arrayUnion(cursoId)
-                });
-            } else {
-                await updateDoc(doc(db, 'users', userId), {
-                    progresso: arrayRemove(cursoId)
-                });
-            }
-        }
-
-        // ========== VARIÁVEIS GLOBAIS ==========
-        let usuarioAtual = null;
-        let tipoUsuario = null;
-        let userData = null;
-
-        // ========== INICIALIZAÇÃO ==========
-        document.addEventListener('DOMContentLoaded', function() {
-            // Verificar configuração do Firebase
-            checkFirebaseConfig();
-            
-            // Elementos da página
-            const loginPage = document.getElementById('login-page');
-            const alunoDashboard = document.getElementById('aluno-dashboard');
-            const professorDashboard = document.getElementById('professor-dashboard');
-            const googleLoginBtn = document.getElementById('google-login-btn');
-            const cadastrarUsuarioBtn = document.getElementById('cadastrar-usuario-btn');
-            const cadastrarUsuarioProfBtn = document.getElementById('cadastrar-usuario-prof-btn');
-            const logoutBtn = document.getElementById('logout-btn');
-            const profLogoutBtn = document.getElementById('prof-logout-btn');
-            const loadingSpinner = document.getElementById('loading-spinner');
-            const loginError = document.getElementById('login-error');
-            const errorMessage = document.getElementById('error-message');
-
-            // Elementos do dashboard do aluno
-            const userPhoto = document.getElementById('user-photo');
-            const userName = document.getElementById('user-name');
-            const userRole = document.getElementById('user-role');
-            const profileName = document.getElementById('profile-name');
-            const profileCargo = document.getElementById('profile-cargo');
-            const profileSetor = document.getElementById('profile-setor');
-            const profileEmail = document.getElementById('profile-email');
-            const trilhaTitulo = document.getElementById('trilha-titulo');
-            const trilhaDescricao = document.getElementById('trilha-descricao');
-            const progressBar = document.getElementById('progress-bar');
-            const progressText = document.getElementById('progress-text');
-            const cursosList = document.getElementById('cursos-list');
-            const documentosList = document.getElementById('documentos-list');
-            const profileFullname = document.getElementById('profile-fullname');
-            const profilePosition = document.getElementById('profile-position');
-            const profilePhoto = document.getElementById('profile-photo');
-            const profilePhone = document.getElementById('profile-phone');
-            const profileBirthdate = document.getElementById('profile-birthdate');
-            const profileAdmission = document.getElementById('profile-admission');
-            const profileManager = document.getElementById('profile-manager');
-
-            // Abas do aluno
-            const tabTrilha = document.getElementById('tab-trilha');
-            const tabPerfil = document.getElementById('tab-perfil');
-            const conteudoTrilha = document.getElementById('conteudo-trilha');
-            const conteudoPerfil = document.getElementById('conteudo-perfil');
-
-            // Abas do professor
-            const tabProfTrilhas = document.getElementById('tab-prof-trilhas');
-            const tabProfAlunos = document.getElementById('tab-prof-alunos');
-            const tabProfConteudos = document.getElementById('tab-prof-conteudos');
-            const conteudoProfTrilhas = document.getElementById('conteudo-prof-trilhas');
-            const conteudoProfAlunos = document.getElementById('conteudo-prof-alunos');
-            const conteudoProfConteudos = document.getElementById('conteudo-prof-conteudos');
-
-            // Botões de edição do perfil
-            const editProfileBtn = document.getElementById('edit-profile-btn');
-            const editPhotoBtn = document.getElementById('edit-photo-btn');
-
-            // Elementos do dashboard do professor
-            const profPhoto = document.getElementById('prof-photo');
-            const profName = document.getElementById('prof-name');
-            const addTrilhaBtn = document.getElementById('add-trilha-btn');
-            const addCursoBtn = document.getElementById('add-curso-btn');
-            const addConteudoBtn = document.getElementById('add-conteudo-btn');
-            const uploadDocBtn = document.getElementById('upload-doc-btn');
-            const trilhaModal = document.getElementById('trilha-modal');
-            const cursoModal = document.getElementById('curso-modal');
-            const conteudoModal = document.getElementById('conteudo-modal');
-            const cadastroUsuarioModal = document.getElementById('cadastro-usuario-modal');
-            const editarPerfilModal = document.getElementById('editar-perfil-modal');
-            const trilhaForm = document.getElementById('trilha-form');
-            const cursoForm = document.getElementById('curso-form');
-            const conteudoForm = document.getElementById('conteudo-form');
-            const cadastroUsuarioForm = document.getElementById('cadastro-usuario-form');
-            const editarPerfilForm = document.getElementById('editar-perfil-form');
-            const cancelTrilha = document.getElementById('cancel-trilha');
-            const cancelCurso = document.getElementById('cancel-curso');
-            const cancelConteudo = document.getElementById('cancel-conteudo');
-            const cancelCadastroUsuario = document.getElementById('cancel-cadastro-usuario');
-            const cancelEditarPerfil = document.getElementById('cancel-editar-perfil');
-            const trilhasProfList = document.getElementById('trilhas-prof-list');
-            const alunosTableBody = document.getElementById('alunos-table-body');
-            const conteudosTableBody = document.getElementById('conteudos-table-body');
-            const totalTrilhas = document.getElementById('total-trilhas');
-            const totalCursos = document.getElementById('total-cursos');
-            const totalAlunos = document.getElementById('total-alunos');
-
-            // ========== EVENT LISTENERS ==========
-
-            // Login com Google
-            googleLoginBtn.addEventListener('click', async () => {
-                try {
-                    console.log('🎯 Botão de login clicado');
-                    loadingSpinner.classList.remove('hidden');
+            auth.signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    // Login bem-sucedido
+                    const user = userCredential.user;
                     loginError.classList.add('hidden');
-                    googleLoginBtn.classList.add('login-loading');
-                    googleLoginBtn.disabled = true;
-                    
-                    const user = await loginWithGoogle();
-                    userData = await getUserData(user.uid);
-                    usuarioAtual = user.uid;
-                    tipoUsuario = userData.tipo;
-                    
-                    console.log('📊 Tipo de usuário:', tipoUsuario);
-                    
-                    if (tipoUsuario === 'professor') {
-                        await loadProfessorDashboard(userData);
-                    } else {
-                        await loadAlunoDashboard(userData);
-                    }
-                    
-                    loadingSpinner.classList.add('hidden');
-                    googleLoginBtn.classList.remove('login-loading');
-                    googleLoginBtn.disabled = false;
-                } catch (error) {
-                    console.error('❌ Erro no processo de login:', error);
-                    loadingSpinner.classList.add('hidden');
-                    googleLoginBtn.classList.remove('login-loading');
-                    googleLoginBtn.disabled = false;
+                    loadUserData(user.uid);
+                })
+                .catch((error) => {
+                    // Tratar erros de login
+                    loginError.textContent = error.message;
                     loginError.classList.remove('hidden');
-                    errorMessage.textContent = error.message || 'Erro ao fazer login. Tente novamente.';
-                }
-            });
-
-            // Logout
-            const handleLogout = () => {
-                signOut(auth).then(() => {
-                    console.log('👋 Usuário deslogado');
-                    usuarioAtual = null;
-                    tipoUsuario = null;
-                    userData = null;
-                    alunoDashboard.classList.add('hidden');
-                    professorDashboard.classList.add('hidden');
-                    loginPage.classList.remove('hidden');
-                }).catch((error) => {
-                    console.error('Erro no logout:', error);
                 });
-            };
+        });
 
-            logoutBtn?.addEventListener('click', handleLogout);
-            profLogoutBtn?.addEventListener('click', handleLogout);
-
-            // Monitorar estado de autenticação
-            onAuthStateChanged(auth, async (user) => {
-                console.log('🔄 Estado de autenticação alterado:', user ? 'Usuário logado' : 'Usuário deslogado');
-                
-                if (user) {
-                    console.log('📋 Dados do usuário autenticado:', {
-                        uid: user.uid,
-                        email: user.email,
-                        displayName: user.displayName
-                    });
+        // Registro com Firebase
+        registerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('regName').value;
+            const role = document.getElementById('regRole').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            
+            auth.createUserWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    // Usuário criado com sucesso
+                    const user = userCredential.user;
                     
-                    usuarioAtual = user.uid;
-                    try {
-                        userData = await getUserData(user.uid);
-                        if (userData) {
-                            tipoUsuario = userData.tipo;
-                            console.log('🎓 Tipo de usuário detectado:', tipoUsuario);
-                            
-                            if (tipoUsuario === 'professor') {
-                                await loadProfessorDashboard(userData);
-                            } else {
-                                await loadAlunoDashboard(userData);
-                            }
-                        } else {
-                            console.error('❌ Dados do usuário não encontrados no Firestore');
-                            // Forçar logout se dados não existem
-                            await signOut(auth);
-                        }
-                    } catch (error) {
-                        console.error('❌ Erro ao carregar dados do usuário:', error);
-                    }
-                } else {
-                    // Usuário deslogado
-                    console.log('🚫 Nenhum usuário autenticado');
-                    alunoDashboard.classList.add('hidden');
-                    professorDashboard.classList.add('hidden');
-                    loginPage.classList.remove('hidden');
-                    loadingSpinner.classList.add('hidden');
-                }
+                    // Salvar dados adicionais no Firestore
+                    return db.collection('users').doc(user.uid).set({
+                        name: name,
+                        role: role,
+                        email: email,
+                        isAdmin: false, // Por padrão, novos usuários não são admins
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                })
+                .then(() => {
+                    // Registro completo
+                    registerError.classList.add('hidden');
+                    registerSuccess.textContent = "Conta criada com sucesso! Redirecionando...";
+                    registerSuccess.classList.remove('hidden');
+                    
+                    // Redirecionar para o dashboard após um breve delay
+                    setTimeout(() => {
+                        registerScreen.classList.add('hidden');
+                        loginScreen.classList.remove('hidden');
+                        registerForm.reset();
+                        registerSuccess.classList.add('hidden');
+                    }, 2000);
+                })
+                .catch((error) => {
+                    // Tratar erros de registro
+                    registerError.textContent = error.message;
+                    registerError.classList.remove('hidden');
+                });
+        });
+
+        // Logout
+        logoutBtn.addEventListener('click', () => {
+            auth.signOut().then(() => {
+                dashboard.classList.add('hidden');
+                loginScreen.classList.remove('hidden');
             });
+        });
 
-            // Resto do código permanece igual...
-            // [O restante do código JavaScript permanece igual ao anterior]
+        // Navegação entre seções
+        navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                // Remover classe active de todos os itens
+                navItems.forEach(i => i.classList.remove('active'));
+                // Adicionar classe active ao item clicado
+                item.classList.add('active');
+                
+                // Ocultar todas as seções
+                sections.forEach(section => section.classList.add('hidden'));
+                
+                // Mostrar a seção correspondente
+                const sectionId = item.getAttribute('data-section') + 'Section';
+                document.getElementById(sectionId).classList.remove('hidden');
+            });
+        });
 
+        // Filtrar cursos
+        courseFilter.addEventListener('change', () => {
+            renderCourses(courseFilter.value);
+        });
+
+        // Modal functions
+        document.getElementById('addCourseBtn').addEventListener('click', () => {
+            addCourseModal.style.display = 'flex';
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            addCourseModal.style.display = 'none';
+        });
+
+        window.addEventListener('click', (e) => {
+            if (e.target === addCourseModal) {
+                addCourseModal.style.display = 'none';
+            }
+        });
+
+        // Adicionar novo curso
+        addCourseForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const title = document.getElementById('courseTitle').value;
+            const category = document.getElementById('courseCategory').value;
+            const description = document.getElementById('courseDescription').value;
+            const color = document.getElementById('courseColor').value;
+            
+            // Adicionar curso ao Firestore
+            db.collection('courses').add({
+                title: title,
+                category: category,
+                description: description,
+                color: color,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdBy: auth.currentUser.uid
+            })
+            .then(() => {
+                alert('Curso adicionado com sucesso!');
+                addCourseModal.style.display = 'none';
+                addCourseForm.reset();
+                loadCourses(); // Recarregar cursos
+            })
+            .catch((error) => {
+                alert('Erro ao adicionar curso: ' + error.message);
+            });
+        });
+
+        // Carregar dados do usuário
+        function loadUserData(userId) {
+            db.collection('users').doc(userId).get()
+                .then((doc) => {
+                    if (doc.exists) {
+                        const userData = doc.data();
+                        userName.textContent = userData.name;
+                        userRole.textContent = userData.role;
+                        
+                        // Verificar se o usuário é admin
+                        if (userData.isAdmin) {
+                            adminPanel.classList.remove('hidden');
+                        }
+                        
+                        // Mostrar dashboard
+                        loginScreen.classList.add('hidden');
+                        dashboard.classList.remove('hidden');
+                        
+                        // Carregar cursos
+                        loadCourses();
+                    }
+                })
+                .catch((error) => {
+                    console.error("Erro ao carregar dados do usuário:", error);
+                });
+        }
+
+        // Carregar cursos do Firestore
+        function loadCourses() {
+            db.collection('courses').get()
+                .then((querySnapshot) => {
+                    userCourses = [];
+                    querySnapshot.forEach((doc) => {
+                        const course = doc.data();
+                        course.id = doc.id;
+                        // Adicionar progresso aleatório para demonstração
+                        course.progress = Math.floor(Math.random() * 100);
+                        course.status = course.progress === 100 ? 'completed' : 
+                                       course.progress > 0 ? 'in-progress' : 'pending';
+                        userCourses.push(course);
+                    });
+                    renderCourses('all');
+                    updateStats();
+                })
+                .catch((error) => {
+                    console.error("Erro ao carregar cursos:", error);
+                });
+        }
+
+        // Renderizar cursos
+        function renderCourses(filter = 'all') {
+            coursesGrid.innerHTML = '';
+            
+            let filteredCourses = userCourses;
+            
+            if (filter !== 'all') {
+                filteredCourses = userCourses.filter(course => course.status === filter);
+            }
+            
+            if (filteredCourses.length === 0) {
+                coursesGrid.innerHTML = '<p>Nenhum curso encontrado.</p>';
+                return;
+            }
+            
+            filteredCourses.forEach(course => {
+                const courseCard = document.createElement('div');
+                courseCard.className = 'course-card';
+                
+                let actionButton = '';
+                if (course.progress === 100) {
+                    actionButton = '<button class="btn btn-outline certificate-btn" data-id="' + course.id + '">Certificado</button>';
+                } else if (course.progress > 0) {
+                    actionButton = '<button class="btn btn-primary continue-btn" data-id="' + course.id + '">Continuar</button>';
+                } else {
+                    actionButton = '<button class="btn btn-primary start-btn" data-id="' + course.id + '">Iniciar</button>';
+                }
+                
+                courseCard.innerHTML = `
+                    <div class="course-image" style="background-color: ${course.color};">
+                        ${course.category}
+                    </div>
+                    <div class="course-content">
+                        <div class="course-title">${course.title}</div>
+                        <div class="course-description">${course.description}</div>
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div class="progress" style="width: ${course.progress}%"></div>
+                            </div>
+                            <div class="progress-text">
+                                <span>Progresso</span>
+                                <span>${course.progress}%</span>
+                            </div>
+                        </div>
+                        <div class="course-actions">
+                            ${actionButton}
+                            <button class="btn btn-outline details-btn" data-id="${course.id}">Detalhes</button>
+                        </div>
+                    </div>
+                `;
+                
+                coursesGrid.appendChild(courseCard);
+            });
+            
+            // Adicionar event listeners aos botões dos cursos
+            document.querySelectorAll('.continue-btn, .start-btn, .certificate-btn, .details-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const courseId = e.target.getAttribute('data-id');
+                    handleCourseAction(courseId, e.target.classList.contains('details-btn'));
+                });
+            });
+        }
+
+        // Atualizar estatísticas
+        function updateStats() {
+            const activeCourses = userCourses.filter(course => course.progress < 100 && course.progress > 0).length;
+            const completedCourses = userCourses.filter(course => course.progress === 100).length;
+            const averageProgress = userCourses.length > 0 ? 
+                Math.round(userCourses.reduce((sum, course) => sum + course.progress, 0) / userCourses.length) : 0;
+            
+            document.getElementById('activeCourses').textContent = activeCourses;
+            document.getElementById('certificates').textContent = completedCourses;
+            document.getElementById('averageProgress').textContent = `${averageProgress}%`;
+        }
+
+        // Manipular ações dos cursos
+        function handleCourseAction(courseId, isDetails = false) {
+            const course = userCourses.find(c => c.id === courseId);
+            
+            if (isDetails) {
+                alert(`Detalhes do curso: ${course.title}\n\n${course.description}\n\nProgresso: ${course.progress}%`);
+            } else {
+                if (course.progress === 100) {
+                    alert(`Parabéns! Você concluiu o curso "${course.title}".\n\nSeu certificado está disponível para download.`);
+                } else {
+                    alert(`Abrindo o curso: ${course.title}`);
+                    // Aqui você implementaria a lógica para abrir o curso
+                }
+            }
+        }
+
+        // Ações do painel administrativo
+        document.getElementById('manageUsersBtn').addEventListener('click', () => {
+            alert('Funcionalidade: Gerenciar colaboradores\n\nEsta funcionalidade permitiria visualizar e gerenciar todos os usuários do sistema.');
+        });
+
+        document.getElementById('reportsBtn').addEventListener('click', () => {
+            alert('Funcionalidade: Relatórios de progresso\n\nEsta funcionalidade permitiria visualizar relatórios detalhados do progresso dos colaboradores.');
+        });
+
+        document.getElementById('systemSettingsBtn').addEventListener('click', () => {
+            alert('Funcionalidade: Configurações do sistema\n\nEsta funcionalidade permitiria configurar parâmetros do sistema.');
+        });
+
+        // Verificar estado de autenticação ao carregar a página
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // Usuário está logado
+                loadUserData(user.uid);
+            } else {
+                // Usuário não está logado
+                dashboard.classList.add('hidden');
+                loginScreen.classList.remove('hidden');
+            }
         });
     </script>
-    <style>
-        .loading-spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            border-left-color: #3b82f6;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
-        
-        .login-loading {
-            opacity: 0.7;
-            pointer-events: none;
-        }
-        
-        .login-error {
-            background-color: #fee2e2;
-            border: 1px solid #fecaca;
-            color: #dc2626;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-        }
-        
-        .login-success {
-            background-color: #d1fae5;
-            border: 1px solid #a7f3d0;
-            color: #065f46;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-        }
-        
-        .hidden {
-            display: none;
-        }
-        
-        .progress-bar {
-            transition: width 0.5s ease-in-out;
-        }
-        
-        .curso-card {
-            transition: all 0.3s ease;
-        }
-        
-        .curso-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        }
-        
-        .trilha-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        
-        .modal-overlay {
-            background-color: rgba(0, 0, 0, 0.5);
-        }
-        
-        .active-tab {
-            border-bottom: 3px solid #3b82f6;
-            color: #3b82f6;
-            font-weight: 600;
-        }
-        
-        .fade-in {
-            animation: fadeIn 0.5s ease-in;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-    </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
-    <!-- Página de Login -->
-    <div id="login-page" class="min-h-screen flex items-center justify-center p-4 fade-in">
-        <div class="w-full max-w-md p-8 bg-white rounded-xl shadow-lg">
-            <div class="text-center mb-8">
-                <div class="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="fas fa-graduation-cap text-white text-3xl"></i>
-                </div>
-                <h1 class="text-3xl font-bold text-gray-800">Sistema de Capacitação</h1>
-                <p class="text-gray-600 mt-2">Desenvolvimento Profissional Interno</p>
-            </div>
-            
-            <div id="login-error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                <span id="error-message"></span>
-            </div>
-            
-            <div id="loading-spinner" class="loading-spinner hidden"></div>
-            
-            <div class="space-y-4">
-                <button id="google-login-btn" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 rounded-lg px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                    <svg class="w-5 h-5" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    Entrar com Google
-                </button>
-                
-                <div class="text-center text-sm text-gray-500">
-                    <p>Acesso restrito a colaboradores da empresa</p>
-                </div>
-                
-                <!-- Botão para cadastrar novo usuário -->
-                <div class="text-center mt-4">
-                    <button id="cadastrar-usuario-btn" class="text-blue-500 hover:text-blue-700 underline">
-                        Cadastrar novo usuário
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Resto do HTML permanece igual -->
-    <!-- [O restante do HTML permanece igual ao código anterior] -->
-
 </body>
 </html>
